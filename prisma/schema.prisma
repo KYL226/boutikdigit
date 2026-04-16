@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  whatsapp  String?
+  role      String   @default("CLIENT") // CLIENT, MARCHAND, ADMIN
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop      Shop?
+  orders    Order[]
+}
+
+model Shop {
+  id             String   @id @default(cuid())
+  name           String
+  description    String   @default("")
+  whatsappNumber String
+  image          String?
+  location       String   // quartier
+  city           String   // ville
+  isActive       Boolean  @default(true)
+  category       String   @default("General")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  products       Product[]
+  orders         Order[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  price       Float
+  image       String?
+  isAvailable Boolean  @default(true)
+  category    String   @default("General")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  status          String      @default("PENDING") // PENDING, CONFIRMED, DELIVERED, CANCELLED
+  total           Float
+  customerName    String
+  customerPhone   String
+  customerNote    String?
+  deliveryAddress String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  shopId          String
+  shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  clientId        String?
+  client          User?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  quantity    Int
+  price       Float
+  productName String
+
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
