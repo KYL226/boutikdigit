@@ -23,12 +23,12 @@ export default function LoginView() {
     setError('')
     setLoading(true)
     try {
-      const success = await login(email, password)
-      if (success) {
+      const result = await login(email, password)
+      if (result.success) {
         toast.success('Connexion réussie !')
         setView('home')
       } else {
-        setError('Email ou mot de passe incorrect')
+        setError(result.error || 'Email ou mot de passe incorrect')
       }
     } catch {
       setError('Erreur de connexion')
@@ -42,12 +42,12 @@ export default function LoginView() {
     setPassword(password)
     setLoading(true)
     try {
-      const success = await login(email, password)
-      if (success) {
+      const result = await login(email, password)
+      if (result.success) {
         toast.success('Connexion réussie !')
         setView('home')
       } else {
-        setError('Identifiants invalides')
+        setError(result.error || 'Identifiants invalides')
       }
     } catch {
       setError('Erreur de connexion')

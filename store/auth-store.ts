@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { getSession, signIn, signOut } from 'next-auth/react'
 
 interface User {
   id: string
@@ -14,8 +15,8 @@ interface AuthState {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<boolean>
-  register: (data: RegisterData) => Promise<boolean>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   checkSession: () => Promise<void>
 }
@@ -42,22 +43,25 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (email: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/callback/credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ email, password }),
+      const result = await signIn('credentials', {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
       })
-      if (res.ok) {
-        const sessionRes = await fetch('/api/auth/session')
-        const session = await sessionRes.json()
-        if (session?.user) {
-          set({ user: session.user as User, isAuthenticated: true })
-          return true
-        }
+
+      if (result?.error) {
+        return { success: false, error: 'Email ou mot de passe incorrect' }
       }
-      return false
+
+      const session = await getSession()
+      if (session?.user) {
+        set({ user: session.user as User, isAuthenticated: true, isLoading: false })
+        return { success: true }
+      }
+
+      return { success: false, error: 'Session non recuperee apres connexion' }
     } catch {
-      return false
+      return { success: false, error: 'Erreur de connexion au serveur' }
     }
   },
 
@@ -70,18 +74,22 @@ export const useAuthStore = create<AuthState>((set) => ({
       })
       if (res.ok) {
         // Auto-login after registration
-        const loginSuccess = await useAuthStore.getState().login(data.email, data.password)
-        return loginSuccess
+        return await useAuthStore.getState().login(data.email, data.password)
       }
-      return false
+
+      const payload = await res.json().catch(() => null)
+      return {
+        success: false,
+        error: payload?.error || "Erreur lors de la creation du compte",
+      }
     } catch {
-      return false
+      return { success: false, error: 'Erreur de connexion au serveur' }
     }
   },
 
   logout: async () => {
     try {
-      await fetch('/api/auth/signout', { method: 'POST' })
+      await signOut({ redirect: false })
     } finally {
       set({ user: null, isAuthenticated: false })
     }
@@ -89,8 +97,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   checkSession: async () => {
     try {
-      const res = await fetch('/api/auth/session')
-      const session = await res.json()
+      const session = await getSession()
       if (session?.user) {
         set({ user: session.user as User, isAuthenticated: true, isLoading: false })
       } else {

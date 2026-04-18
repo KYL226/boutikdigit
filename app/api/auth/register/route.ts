@@ -6,9 +6,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { name, email, password, role, phone, whatsapp, shopName, shopDescription, shopWhatsappNumber, shopLocation, shopCity, shopCategory } = body
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : ""
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return NextResponse.json(
         { error: "Nom, email et mot de passe sont requis" },
         { status: 400 }
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Check email uniqueness
     const existingUser = await db.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     })
 
     if (existingUser) {
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     const user = await db.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         role: userRole,
         phone: phone || null,

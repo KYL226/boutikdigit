@@ -33,7 +33,7 @@ export default function OrdersView() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    
       setLoading(false)
       return
     }
@@ -45,7 +45,7 @@ export default function OrdersView() {
       } catch (err) {
         console.error(err)
       } finally {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+        
         setLoading(false)
       }
     }

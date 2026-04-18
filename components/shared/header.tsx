@@ -27,6 +27,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import type { AppView } from '@/store/app-store'
+
+interface NavItem {
+  label: string
+  view: AppView
+  icon: React.ComponentType<{ className?: string }>
+  badge?: number
+}
 
 export default function Header() {
   const { currentView, setView } = useAppStore()
@@ -37,26 +45,26 @@ export default function Header() {
   const itemCount = getItemCount()
   const favCount = getFavCount()
 
-  const navItems = [
-    { label: 'Accueil', view: 'home' as const, icon: Store },
-    { label: 'Favoris', view: 'favorites' as const, icon: Heart, badge: favCount },
-    { label: 'Panier', view: 'cart' as const, icon: ShoppingCart, badge: itemCount },
+  const navItems: NavItem[] = [
+    { label: 'Accueil', view: 'home', icon: Store },
+    { label: 'Favoris', view: 'favorites', icon: Heart, badge: favCount },
+    { label: 'Panier', view: 'cart', icon: ShoppingCart, badge: itemCount },
   ]
 
   if (isAuthenticated && user?.role === 'MARCHAND') {
-    navItems.push({ label: 'Tableau de bord', view: 'dashboard' as const, icon: LayoutDashboard })
+    navItems.push({ label: 'Tableau de bord', view: 'dashboard', icon: LayoutDashboard })
   }
 
   if (isAuthenticated && user?.role === 'ADMIN') {
-    navItems.push({ label: 'Administration', view: 'admin' as const, icon: Shield })
+    navItems.push({ label: 'Administration', view: 'admin', icon: Shield })
   }
 
   if (isAuthenticated) {
-    navItems.push({ label: 'Commandes', view: 'orders' as const, icon: Package })
+    navItems.push({ label: 'Commandes', view: 'orders', icon: Package })
   }
 
-  const handleNavClick = (view: string) => {
-    setView(view as any)
+  const handleNavClick = (view: AppView) => {
+    setView(view)
     setMobileOpen(false)
   }
 

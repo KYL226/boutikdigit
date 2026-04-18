@@ -61,7 +61,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Heart className="h-4 w-4 text-rose-500" />
-                <span>Fait avec amour à Djibouti</span>
+                <span>Fait avec amour par Digit Tech Group</span>
               </div>
             </div>
           </div>

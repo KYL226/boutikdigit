@@ -71,7 +71,7 @@ export default function AdminView() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [users, setUsers] = useState<UserData[]>([])
   const [shops, setShops] = useState<ShopData[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   const fetchStats = async () => {
     try {
@@ -101,16 +101,18 @@ export default function AdminView() {
   }
 
   useEffect(() => {
-    if (user?.role === 'ADMIN') {
-      const loadData = async () => {
+    if (user?.role !== 'ADMIN') return
+
+    const loadData = async () => {
+      setLoading(true)
+      try {
         await Promise.all([fetchStats(), fetchUsers(), fetchShops()])
+      } finally {
         setLoading(false)
       }
-      loadData()
-    } else {
-      setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
+    loadData()
   }, [user?.role])
 
   const handleToggleShop = async (shopId: string) => {

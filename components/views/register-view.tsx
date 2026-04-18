@@ -60,7 +60,7 @@ export default function RegisterView() {
     setError('')
     setLoading(true)
     try {
-      const success = await register({
+      const result = await register({
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -74,11 +74,11 @@ export default function RegisterView() {
         shopCity: role === 'MARCHAND' ? formData.shopCity : undefined,
         shopCategory: role === 'MARCHAND' ? formData.shopCategory : undefined,
       })
-      if (success) {
+      if (result.success) {
         toast.success('Compte créé avec succès !')
         setView(role === 'MARCHAND' ? 'dashboard' : 'home')
       } else {
-        setError("Erreur lors de la création du compte. L'email est peut-être déjà utilisé.")
+        setError(result.error || "Erreur lors de la creation du compte.")
       }
     } catch {
       setError('Erreur de connexion')
