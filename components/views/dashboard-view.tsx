@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useAuthStore } from '@/store/auth-store'
 import { formatPrice, formatDate, getCategoryIcon, getCategoryColor, getStatusColor, getStatusLabel } from '@/lib/helpers'
@@ -85,9 +86,63 @@ interface OrderData {
   items: { id: string; productName: string; quantity: number; price: number }[]
 }
 
+interface DashboardStats {
+  total: number
+  pending: number
+  confirmed: number
+  delivered: number
+  revenue: number
+  productsAvailable: number
+  productsTotal: number
+}
+
+function MerchantStatsCards({ stats }: { stats: DashboardStats }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-orange-50 to-amber-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4 text-orange-500" />
+            <span className="text-xs text-muted-foreground">Commandes</span>
+          </div>
+          <p className="text-2xl font-bold text-orange-600 mt-1">{stats.total}</p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-yellow-50 to-amber-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-yellow-500" />
+            <span className="text-xs text-muted-foreground">En attente</span>
+          </div>
+          <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pending}</p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-green-50 to-emerald-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-green-500" />
+            <span className="text-xs text-muted-foreground">Revenus</span>
+          </div>
+          <p className="text-lg font-bold text-green-600 mt-1">{formatPrice(stats.revenue)}</p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-blue-50 to-sky-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-blue-500" />
+            <span className="text-xs text-muted-foreground">Produits</span>
+          </div>
+          <p className="text-2xl font-bold text-blue-600 mt-1">{stats.productsAvailable}/{stats.productsTotal}</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function DashboardView() {
   const { setView, setSelectedShopId } = useAppStore()
   const { user } = useAuthStore()
+  const router = useRouter()
   const [shop, setShop] = useState<ShopData | null>(null)
   const [orders, setOrders] = useState<OrderData[]>([])
   const [loading, setLoading] = useState(true)
@@ -333,7 +388,10 @@ export default function DashboardView() {
     return (
       <div className="text-center py-16">
         <p className="text-muted-foreground">Accès réservé aux marchands</p>
-        <Button onClick={() => setView('home')} className="mt-4">Retour</Button>
+        <Button onClick={() => {
+          setView('home')
+          router.push('/')
+        }} className="mt-4">Retour</Button>
       </div>
     )
   }
@@ -461,6 +519,7 @@ export default function DashboardView() {
             onClick={() => {
               setSelectedShopId(shop.id)
               setView('shop')
+              router.push(`/shop/${shop.id}`)
             }}
             className="hover:bg-orange-50"
           >
@@ -470,45 +529,7 @@ export default function DashboardView() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-orange-50 to-amber-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4 text-orange-500" />
-              <span className="text-xs text-muted-foreground">Commandes</span>
-            </div>
-            <p className="text-2xl font-bold text-orange-600 mt-1">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-yellow-50 to-amber-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              <span className="text-xs text-muted-foreground">En attente</span>
-            </div>
-            <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pending}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-green-50 to-emerald-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-500" />
-              <span className="text-xs text-muted-foreground">Revenus</span>
-            </div>
-            <p className="text-lg font-bold text-green-600 mt-1">{formatPrice(stats.revenue)}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-blue-50 to-sky-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-blue-500" />
-              <span className="text-xs text-muted-foreground">Produits</span>
-            </div>
-            <p className="text-2xl font-bold text-blue-600 mt-1">{stats.productsAvailable}/{stats.productsTotal}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <MerchantStatsCards stats={stats} />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -538,6 +559,7 @@ export default function DashboardView() {
           onClick={() => {
             setSelectedShopId(shop.id)
             setView('shop')
+            router.push(`/shop/${shop.id}`)
           }}
         >
           <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
@@ -551,6 +573,7 @@ export default function DashboardView() {
           onClick={() => {
             setSelectedShopId(shop.id)
             setView('orders')
+            router.push('/orders')
           }}
         >
           <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">

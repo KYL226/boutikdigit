@@ -2,6 +2,25 @@
 
 BoutikDigit est une application Next.js 16 orientee marketplace locale: elle permet d'afficher des boutiques, consulter des produits, gerer un panier, passer des commandes et administrer le contenu selon le role utilisateur.
 
+## Installation
+
+### Prerequis
+- Node.js 20+ (recommande)
+- npm
+- Une base MySQL
+
+### Etapes
+1. Cloner le projet et ouvrir le dossier.
+2. Installer les dependances:
+   - `npm install`
+3. Configurer les variables d'environnement dans `.env` (au minimum `DATABASE_URL` et les variables NextAuth).
+4. Generer le client Prisma:
+   - `npm run db:generate`
+5. Synchroniser la base:
+   - `npm run db:push`
+6. Lancer le serveur de dev:
+   - `npm run dev`
+
 ## Etat actuel du projet
 
 ### Stack technique
@@ -25,14 +44,55 @@ BoutikDigit est une application Next.js 16 orientee marketplace locale: elle per
 
 ### Fonctionnement applicatif principal
 - L'interface cliente principale est rendue via `app/page.tsx`.
-- La navigation interne est pilotee par un store (`currentView`) plutot que par des routes URL dediees.
+- La navigation principale est maintenant exposee via des routes App Router (`/`, `/shop/[id]`, `/cart`, `/favorites`, `/orders`, `/dashboard`, `/admin`, `/login`, `/register`), avec conservation du store pour l'etat UI/metier.
 - Les donnees sont consommees via les endpoints `app/api/*`.
 - Le modele de donnees Prisma couvre users, shops, products, orders et orderItems.
 
+## Usage
+
+### En local
+- Demarrer l'application: `npm run dev`
+- Ouvrir [http://localhost:3000](http://localhost:3000)
+- Parcourir les routes principales:
+  - `/` (accueil)
+  - `/shop/[id]` (detail boutique)
+  - `/cart`, `/favorites`, `/orders`
+  - `/login`, `/register`
+  - `/dashboard` (marchand), `/admin` (admin)
+
+### Scripts utiles
+- `npm run dev` : lancer l'application en local
+- `npm run build` : compiler l'application
+- `npm run start` : executer la version build
+- `npm run lint` : verifier le lint
+- `npm run db:push` : synchroniser le schema Prisma
+- `npm run db:generate` : generer le client Prisma
+- `npm run db:migrate` : lancer une migration Prisma
+- `npm run db:reset` : reinitialiser la base (attention: destructif)
+
+## API
+
+Les endpoints sont exposes via App Router dans `app/api/**/route.ts`.
+
+### Endpoints principaux
+- `POST /api/auth/register` : inscription utilisateur
+- `GET/POST /api/auth/[...nextauth]` : authentification NextAuth (credentials/session)
+- `GET /api/shops` : liste des boutiques
+- `GET /api/products` : liste/consultation des produits
+- `GET/POST /api/orders` : gestion des commandes
+- `GET /api/admin` : statistiques/operations d'administration
+- `GET /api/seed` : seed de donnees (usage dev)
+
+### Bonnes pratiques recommandees
+- Valider toutes les entrees (Zod)
+- Normaliser les erreurs API (format unique)
+- Ajouter des controles de role centralises (admin/marchand/client)
+- Documenter les schemas de requete/reponse (OpenAPI ou Markdown)
+
 ## Ameliorations prioritaires recommandees
 
-1. **Passer d'une navigation "view store" a des routes App Router**
-   - Creer des routes dediees (`/shop`, `/cart`, `/dashboard`, etc.) pour SEO, partage d'URL, analytics et maintenabilite.
+1. **Consolider la migration vers App Router**
+   - Poursuivre l'alignement de tous les flux et gardes d'acces autour des routes dediees (`/shop/[id]`, `/cart`, `/dashboard`, etc.) pour SEO, partage d'URL, analytics et maintenabilite.
 2. **Durcir la securite**
    - Deplacer tous les secrets vers des variables d'environnement.
    - Verifier les validations Zod sur toutes les entrees API et harmoniser les erreurs.
@@ -53,6 +113,19 @@ BoutikDigit est une application Next.js 16 orientee marketplace locale: elle per
 - Notifications (commande confirmee, statut modifie, alertes admin).
 - Internationalisation complete de l'interface (si cible multi-langue).
 
+## Suggestions et idees de fonctionnalites
+
+- **Paiement en ligne**: integration Mobile Money / carte (workflow de paiement + webhook de confirmation).
+- **Gestion de livraison**: zones, frais dynamiques, suivi de statut (`en preparation`, `expediee`, `livree`).
+- **Coupons et promotions**: codes promo, remises temporaires, campagnes marketing.
+- **Avis et notation**: notes sur boutiques/produits avec moderation simple.
+- **Messagerie client-marchand**: discussion pre-achat/post-achat dans l'app.
+- **Back-office produit avance**: variantes (taille/couleur), stock bas, import CSV.
+- **Analytics metier**: revenus par periode, taux de conversion, top produits, retention clients.
+- **PWA**: mode mobile installable + notifications push.
+- **Observabilite**: Sentry + logs structures + dashboards de performance.
+- **RGPD/securite**: politique de retention, consentement cookies, suppression compte.
+
 ## Recommandations generales d'evolution
 
 - Standardiser les conventions de code (naming, organisation des dossiers, patterns de hooks/services).
@@ -60,17 +133,6 @@ BoutikDigit est une application Next.js 16 orientee marketplace locale: elle per
 - Centraliser les appels HTTP dans une couche data (services/repository) pour reduire la duplication.
 - Ajouter de la telemetrie (logs structurees, monitoring erreurs, performances).
 - Documenter les flux critiques (auth, commande, admin) et les decisions techniques.
-
-## Scripts utiles
-
-- `npm run dev` : lancer l'application en local
-- `npm run build` : compiler l'application
-- `npm run start` : executer la version build
-- `npm run lint` : verifier le lint
-- `npm run db:push` : synchroniser le schema Prisma
-- `npm run db:generate` : generer le client Prisma
-- `npm run db:migrate` : lancer une migration Prisma
-- `npm run db:reset` : reinitialiser la base (attention: destructif)
 
 ## Notes de reorganisation appliquees
 

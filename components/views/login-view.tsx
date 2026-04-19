@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useAuthStore } from '@/store/auth-store'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ import { Store, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
 export default function LoginView() {
   const { setView } = useAppStore()
   const { login } = useAuthStore()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,6 +29,7 @@ export default function LoginView() {
       if (result.success) {
         toast.success('Connexion réussie !')
         setView('home')
+        router.push('/')
       } else {
         setError(result.error || 'Email ou mot de passe incorrect')
       }
@@ -46,6 +49,7 @@ export default function LoginView() {
       if (result.success) {
         toast.success('Connexion réussie !')
         setView('home')
+        router.push('/')
       } else {
         setError(result.error || 'Identifiants invalides')
       }
@@ -125,7 +129,10 @@ export default function LoginView() {
             <p className="text-sm text-muted-foreground">
               Pas encore de compte ?{' '}
               <button
-                onClick={() => setView('register')}
+                onClick={() => {
+                  setView('register')
+                  router.push('/register')
+                }}
                 className="text-orange-600 hover:text-orange-700 font-semibold"
               >
                 Créer un compte

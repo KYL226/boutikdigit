@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useAuthStore } from '@/store/auth-store'
 import { formatPrice, formatDate, getCategoryIcon, getCategoryColor, getStatusColor, getStatusLabel } from '@/lib/helpers'
@@ -65,9 +66,66 @@ interface ShopData {
   _count: { products: number; orders: number }
 }
 
+interface MainStatsProps {
+  stats: Stats | null
+  totalUsers: number
+  merchantCount: number
+  clientCount: number
+}
+
+function MainStats({ stats, totalUsers, merchantCount, clientCount }: MainStatsProps) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-orange-50 to-amber-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-orange-500" />
+            <span className="text-xs text-muted-foreground">Utilisateurs</span>
+          </div>
+          <p className="text-2xl font-bold text-orange-600 mt-1">{totalUsers}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {merchantCount} marchands • {clientCount} clients
+          </p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-emerald-50 to-teal-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Store className="h-4 w-4 text-emerald-500" />
+            <span className="text-xs text-muted-foreground">Boutiques</span>
+          </div>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">{stats?.totalShops || 0}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {stats?.activeShops || 0} actives
+          </p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-purple-50 to-violet-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-purple-500" />
+            <span className="text-xs text-muted-foreground">Produits</span>
+          </div>
+          <p className="text-2xl font-bold text-purple-600 mt-1">{stats?.totalProducts || 0}</p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-0 bg-gradient-to-br from-rose-50 to-pink-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-rose-500" />
+            <span className="text-xs text-muted-foreground">Revenus</span>
+          </div>
+          <p className="text-lg font-bold text-rose-600 mt-1">{formatPrice(stats?.totalRevenue || 0)}</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function AdminView() {
   const { setView, setSelectedShopId } = useAppStore()
   const { user } = useAuthStore()
+  const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
   const [users, setUsers] = useState<UserData[]>([])
   const [shops, setShops] = useState<ShopData[]>([])
@@ -131,6 +189,7 @@ export default function AdminView() {
   const handleViewShop = (shopId: string) => {
     setSelectedShopId(shopId)
     setView('shop')
+    router.push(`/shop/${shopId}`)
   }
 
   if (loading) {
@@ -151,7 +210,10 @@ export default function AdminView() {
       <div className="text-center py-16">
         <Shield className="h-12 w-12 text-gray-300 mx-auto mb-3" />
         <p className="text-muted-foreground">Accès réservé aux administrateurs</p>
-        <Button onClick={() => setView('home')} className="mt-4">Retour</Button>
+        <Button onClick={() => {
+          setView('home')
+          router.push('/')
+        }} className="mt-4">Retour</Button>
       </div>
     )
   }
@@ -171,6 +233,10 @@ export default function AdminView() {
   }
 
   const maxOrderStatus = stats ? Math.max(...Object.values(stats.ordersByStatus), 1) : 1
+  const totalUsers = stats?.totalUsers ?? 0
+  const merchantCount = stats?.merchantCount ?? 0
+  const clientCount = stats?.clientCount ?? 0
+  const totalOrders = stats?.totalOrders ?? 0
 
   return (
     <div className="space-y-6">
@@ -185,51 +251,12 @@ export default function AdminView() {
         </Badge>
       </div>
 
-      {/* Main Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-orange-50 to-amber-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-orange-500" />
-              <span className="text-xs text-muted-foreground">Utilisateurs</span>
-            </div>
-            <p className="text-2xl font-bold text-orange-600 mt-1">{stats?.totalUsers || 0}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {stats?.merchantCount || 0} marchands • {stats?.clientCount || 0} clients
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-emerald-50 to-teal-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Store className="h-4 w-4 text-emerald-500" />
-              <span className="text-xs text-muted-foreground">Boutiques</span>
-            </div>
-            <p className="text-2xl font-bold text-emerald-600 mt-1">{stats?.totalShops || 0}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {stats?.activeShops || 0} actives
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-purple-50 to-violet-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-purple-500" />
-              <span className="text-xs text-muted-foreground">Produits</span>
-            </div>
-            <p className="text-2xl font-bold text-purple-600 mt-1">{stats?.totalProducts || 0}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-rose-50 to-pink-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-rose-500" />
-              <span className="text-xs text-muted-foreground">Revenus</span>
-            </div>
-            <p className="text-lg font-bold text-rose-600 mt-1">{formatPrice(stats?.totalRevenue || 0)}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <MainStats
+        stats={stats}
+        totalUsers={totalUsers}
+        merchantCount={merchantCount}
+        clientCount={clientCount}
+      />
 
       {/* Order Stats + Category Chart */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -264,7 +291,7 @@ export default function AdminView() {
             <Separator />
             <div className="flex items-center justify-between text-sm font-semibold">
               <span>Total</span>
-              <span className="text-orange-600">{stats?.totalOrders || 0}</span>
+              <span className="text-orange-600">{totalOrders}</span>
             </div>
           </CardContent>
         </Card>

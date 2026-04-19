@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useFavoritesStore } from '@/store/favorites-store'
 import { useCartStore } from '@/store/cart-store'
@@ -28,6 +29,7 @@ interface Shop {
 
 export default function FavoritesView() {
   const { setView, setSelectedShopId } = useAppStore()
+  const router = useRouter()
   const { favoriteShopIds, removeFavorite } = useFavoritesStore()
   const { shopId: cartShopId } = useCartStore()
   const [shops, setShops] = useState<Shop[]>([])
@@ -61,6 +63,7 @@ export default function FavoritesView() {
   const handleShopClick = (shopId: string) => {
     setSelectedShopId(shopId)
     setView('shop')
+    router.push(`/shop/${shopId}`)
   }
 
   const handleRemoveFavorite = (e: React.MouseEvent, shopId: string, shopName: string) => {
@@ -121,7 +124,10 @@ export default function FavoritesView() {
             Ajoutez vos boutiques préférées en cliquant sur le cœur
           </p>
           <Button
-            onClick={() => setView('home')}
+            onClick={() => {
+              setView('home')
+              router.push('/')
+            }}
             className="bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600"
           >
             Explorer les boutiques
