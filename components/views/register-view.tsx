@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useAuthStore } from '@/store/auth-store'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ const CATEGORIES = ['Alimentation', 'Électronique', 'Mode', 'Santé', 'Services
 export default function RegisterView() {
   const { setView } = useAppStore()
   const { register } = useAuthStore()
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -76,7 +78,9 @@ export default function RegisterView() {
       })
       if (result.success) {
         toast.success('Compte créé avec succès !')
-        setView(role === 'MARCHAND' ? 'dashboard' : 'home')
+        const nextView = role === 'MARCHAND' ? 'dashboard' : 'home'
+        setView(nextView)
+        router.push(nextView === 'dashboard' ? '/dashboard' : '/')
       } else {
         setError(result.error || "Erreur lors de la creation du compte.")
       }
@@ -391,7 +395,10 @@ export default function RegisterView() {
             <p className="text-sm text-muted-foreground">
               Déjà un compte ?{' '}
               <button
-                onClick={() => setView('login')}
+                onClick={() => {
+                  setView('login')
+                  router.push('/login')
+                }}
                 className="text-orange-600 hover:text-orange-700 font-semibold"
               >
                 Se connecter

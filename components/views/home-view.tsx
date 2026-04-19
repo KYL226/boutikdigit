@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useCartStore } from '@/store/cart-store'
 import { useFavoritesStore } from '@/store/favorites-store'
@@ -32,6 +33,7 @@ const CITIES = ['Djibouti']
 
 export default function HomeView() {
   const { setView, setSelectedShopId, searchQuery, setSearchQuery, selectedCategory, setSelectedCategory } = useAppStore()
+  const router = useRouter()
   const { shopId: cartShopId } = useCartStore()
   const { toggleFavorite, isFavorite } = useFavoritesStore()
   const [shops, setShops] = useState<Shop[]>([])
@@ -62,6 +64,7 @@ export default function HomeView() {
   const handleShopClick = (shopId: string) => {
     setSelectedShopId(shopId)
     setView('shop')
+    router.push(`/shop/${shopId}`)
   }
 
   const handleToggleFavorite = (e: React.MouseEvent, shopId: string, shopName: string) => {

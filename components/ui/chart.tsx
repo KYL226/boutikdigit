@@ -182,7 +182,9 @@ function ChartTooltipContent({
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
-          const indicatorColor = color || item.payload.fill || item.color
+                  const indicatorColor = color ?? item.payload.fill ?? item.color
+                  const canFormatValue =
+                    Boolean(formatter) && item?.value !== undefined && Boolean(item.name)
 
           return (
             <div
@@ -192,7 +194,7 @@ function ChartTooltipContent({
                 indicator === "dot" && "items-center"
               )}
             >
-              {formatter && item?.value !== undefined && item.name ? (
+              {canFormatValue ? (
                 formatter(item.value, item.name, item, index, item.payload)
               ) : (
                 <>
@@ -232,7 +234,7 @@ function ChartTooltipContent({
                         {itemConfig?.label || item.name}
                       </span>
                     </div>
-                    {item.value && (
+                    {item.value !== undefined && item.value !== null && (
                       <span className="text-foreground font-mono font-medium tabular-nums">
                         {item.value.toLocaleString()}
                       </span>

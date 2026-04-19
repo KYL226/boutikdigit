@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useAuthStore } from '@/store/auth-store'
 import { useCartStore } from '@/store/cart-store'
 import { useFavoritesStore } from '@/store/favorites-store'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import {
   Store,
@@ -32,13 +33,16 @@ import type { AppView } from '@/store/app-store'
 interface NavItem {
   label: string
   view: AppView
+  path: string
   icon: React.ComponentType<{ className?: string }>
   badge?: number
 }
 
 export default function Header() {
-  const { currentView, setView } = useAppStore()
+  const { setView } = useAppStore()
   const { user, isAuthenticated, logout } = useAuthStore()
+  const router = useRouter()
+  const pathname = usePathname()
   const { getItemCount } = useCartStore()
   const { getCount: getFavCount } = useFavoritesStore()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -46,31 +50,34 @@ export default function Header() {
   const favCount = getFavCount()
 
   const navItems: NavItem[] = [
-    { label: 'Accueil', view: 'home', icon: Store },
-    { label: 'Favoris', view: 'favorites', icon: Heart, badge: favCount },
-    { label: 'Panier', view: 'cart', icon: ShoppingCart, badge: itemCount },
+    { label: 'Accueil', view: 'home', path: '/', icon: Store },
+    { label: 'Favoris', view: 'favorites', path: '/favorites', icon: Heart, badge: favCount },
+    { label: 'Panier', view: 'cart', path: '/cart', icon: ShoppingCart, badge: itemCount },
   ]
 
   if (isAuthenticated && user?.role === 'MARCHAND') {
-    navItems.push({ label: 'Tableau de bord', view: 'dashboard', icon: LayoutDashboard })
+    navItems.push({ label: 'Tableau de bord', view: 'dashboard', path: '/dashboard', icon: LayoutDashboard })
   }
 
   if (isAuthenticated && user?.role === 'ADMIN') {
-    navItems.push({ label: 'Administration', view: 'admin', icon: Shield })
+    navItems.push({ label: 'Administration', view: 'admin', path: '/admin', icon: Shield })
   }
 
   if (isAuthenticated) {
-    navItems.push({ label: 'Commandes', view: 'orders', icon: Package })
+    navItems.push({ label: 'Commandes', view: 'orders', path: '/orders', icon: Package })
   }
 
   const handleNavClick = (view: AppView) => {
     setView(view)
+    const item = navItems.find((navItem) => navItem.view === view)
+    if (item) router.push(item.path)
     setMobileOpen(false)
   }
 
   const handleLogout = async () => {
     await logout()
     setView('home')
+    router.push('/')
     setMobileOpen(false)
   }
 
@@ -95,11 +102,11 @@ export default function Header() {
           {navItems.map((item) => (
             <Button
               key={item.view}
-              variant={currentView === item.view ? 'default' : 'ghost'}
+              variant={pathname === item.path ? 'default' : 'ghost'}
               size="sm"
               onClick={() => handleNavClick(item.view)}
               className={`relative ${
-                currentView === item.view
+                pathname === item.path
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-sm shadow-orange-200'
                   : 'hover:bg-orange-50'
               }`}
@@ -123,7 +130,7 @@ export default function Header() {
                 <Button variant="ghost" className="gap-2 hover:bg-orange-50">
                   <Avatar className="h-7 w-7">
                     <AvatarFallback className="bg-gradient-to-br from-orange-400 to-amber-400 text-white text-xs">
-                      {user.name?.charAt(0).toUpperCase()}
+                      {(user.name?.charAt(0) ?? '?').toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <span className="text-sm font-medium max-w-[100px] truncate">{user.name}</span>
@@ -145,14 +152,14 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleNavClick('login')}
+                onClick={() => router.push('/login')}
                 className="hover:bg-orange-50"
               >
                 Se connecter
               </Button>
               <Button
                 size="sm"
-                onClick={() => handleNavClick('register')}
+                onClick={() => router.push('/register')}
                 className="bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-sm shadow-orange-200"
               >
                 Créer un compte
@@ -169,14 +176,18 @@ export default function Header() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-72">
+            <SheetTitle className="sr-only">Menu principal</SheetTitle>
+            <SheetDescription className="sr-only">
+              Navigation mobile et actions de connexion.
+            </SheetDescription>
             <div className="flex flex-col gap-1 mt-6">
               {navItems.map((item) => (
                 <Button
                   key={item.view}
-                  variant={currentView === item.view ? 'default' : 'ghost'}
+                  variant={pathname === item.path ? 'default' : 'ghost'}
                   onClick={() => handleNavClick(item.view)}
                   className={`justify-start relative ${
-                    currentView === item.view
+                    pathname === item.path
                       ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white'
                       : 'hover:bg-orange-50'
                   }`}
@@ -207,14 +218,14 @@ export default function Header() {
                 <>
                   <Button
                     variant="ghost"
-                    onClick={() => handleNavClick('login')}
+                    onClick={() => router.push('/login')}
                     className="justify-start"
                   >
                     <User className="h-4 w-4 mr-2" />
                     Se connecter
                   </Button>
                   <Button
-                    onClick={() => handleNavClick('register')}
+                    onClick={() => router.push('/register')}
                     className="bg-gradient-to-r from-orange-500 to-amber-500 text-white justify-start"
                   >
                     Créer un compte

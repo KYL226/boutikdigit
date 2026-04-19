@@ -1,10 +1,12 @@
 'use client'
 
 import { Store, Heart, MessageCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 
 export default function Footer() {
   const { setView } = useAppStore()
+  const router = useRouter()
 
   return (
     <footer className="border-t bg-gradient-to-b from-gray-50 to-gray-100 mt-auto">
@@ -31,19 +33,28 @@ export default function Footer() {
             <h4 className="text-sm font-semibold text-gray-900">Navigation</h4>
             <div className="flex flex-col gap-2">
               <button
-                onClick={() => setView('home')}
+                onClick={() => {
+                  setView('home')
+                  router.push('/')
+                }}
                 className="text-sm text-muted-foreground hover:text-orange-600 transition-colors text-left"
               >
                 Accueil
               </button>
               <button
-                onClick={() => setView('favorites')}
+                onClick={() => {
+                  setView('favorites')
+                  router.push('/favorites')
+                }}
                 className="text-sm text-muted-foreground hover:text-orange-600 transition-colors text-left"
               >
                 Mes favoris
               </button>
               <button
-                onClick={() => setView('login')}
+                onClick={() => {
+                  setView('login')
+                  router.push('/login')
+                }}
                 className="text-sm text-muted-foreground hover:text-orange-600 transition-colors text-left"
               >
                 Espace marchand

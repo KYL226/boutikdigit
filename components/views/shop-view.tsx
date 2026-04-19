@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useCartStore } from '@/store/cart-store'
 import { useFavoritesStore } from '@/store/favorites-store'
@@ -48,8 +49,13 @@ interface ProductData {
   category: string
 }
 
-export default function ShopView() {
-  const { selectedShopId, setView } = useAppStore()
+interface ShopViewProps {
+  shopId?: string
+}
+
+export default function ShopView({ shopId: shopIdProp }: ShopViewProps = {}) {
+  const { selectedShopId } = useAppStore()
+  const router = useRouter()
   const { addItem, items, shopId: cartShopId, getItemCount } = useCartStore()
   const { toggleFavorite, isFavorite } = useFavoritesStore()
   const [shop, setShop] = useState<ShopData | null>(null)
@@ -58,11 +64,13 @@ export default function ShopView() {
   const [productSearch, setProductSearch] = useState('')
   const itemCount = getItemCount()
 
+  const activeShopId = shopIdProp || selectedShopId
+
   const fetchShop = useCallback(async () => {
-    if (!selectedShopId) return
+    if (!activeShopId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/shops/${selectedShopId}`)
+      const res = await fetch(`/api/shops/${activeShopId}`)
       if (res.ok) {
         const data = await res.json()
         setShop(data)
@@ -72,7 +80,7 @@ export default function ShopView() {
     } finally {
       setLoading(false)
     }
-  }, [selectedShopId])
+  }, [activeShopId])
 
   useEffect(() => {
     fetchShop()
@@ -132,7 +140,7 @@ export default function ShopView() {
     return (
       <div className="text-center py-16">
         <p className="text-muted-foreground">Boutique introuvable</p>
-        <Button onClick={() => setView('home')} className="mt-4">
+        <Button onClick={() => router.push('/')} className="mt-4">
           Retour à l&apos;accueil
         </Button>
       </div>
@@ -152,13 +160,13 @@ export default function ShopView() {
     return colors[index]
   }
 
-  const filteredProducts = shop.products.filter((p) =>
+  const visibleProducts = shop.products.filter((p) =>
     p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
     p.description.toLowerCase().includes(productSearch.toLowerCase())
   )
 
-  const availableProducts = filteredProducts.filter((p) => p.isAvailable)
-  const unavailableProducts = filteredProducts.filter((p) => !p.isAvailable)
+  const availableProducts = visibleProducts.filter((p) => p.isAvailable)
+  const unavailableProducts = visibleProducts.filter((p) => !p.isAvailable)
 
   return (
     <div className="space-y-6 relative">
@@ -166,7 +174,7 @@ export default function ShopView() {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => setView('home')}
+        onClick={() => router.push('/')}
         className="hover:bg-orange-50 -ml-2"
       >
         <ArrowLeft className="h-4 w-4 mr-1" />
@@ -334,10 +342,10 @@ export default function ShopView() {
       )}
 
       {/* Floating Cart Button */}
-      {itemCount > 0 && cartShopId === selectedShopId && (
+      {itemCount > 0 && cartShopId === activeShopId && (
         <div className="fixed bottom-4 right-4 z-40 md:bottom-6 md:right-6">
           <Button
-            onClick={() => setView('cart')}
+            onClick={() => router.push('/cart')}
             className="h-14 px-6 rounded-full shadow-2xl shadow-orange-300/50 bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 text-base font-semibold"
           >
             <ShoppingCart className="h-5 w-5 mr-2" />

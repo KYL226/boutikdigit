@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useCartStore, type CartItem } from '@/store/cart-store'
 import { formatPrice, generateWhatsAppLink } from '@/lib/helpers'
@@ -32,6 +33,7 @@ import {
 
 export default function CartView() {
   const { setView, setSelectedShopId } = useAppStore()
+  const router = useRouter()
   const { items, shopId, shopName, removeItem, updateQuantity, clearCart, getTotal } = useCartStore()
   const [orderDialogOpen, setOrderDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -95,6 +97,7 @@ export default function CartView() {
         clearCart()
         setOrderDialogOpen(false)
         setView('home')
+        router.push('/')
       } else {
         const data = await res.json()
         toast.error(data.error || 'Erreur lors de la commande')
@@ -117,7 +120,10 @@ export default function CartView() {
           Parcourez les boutiques et ajoutez des produits
         </p>
         <Button
-          onClick={() => setView('home')}
+          onClick={() => {
+            setView('home')
+            router.push('/')
+          }}
           className="bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600"
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
@@ -138,8 +144,10 @@ export default function CartView() {
             if (shopId) {
               setSelectedShopId(shopId)
               setView('shop')
+              router.push(`/shop/${shopId}`)
             } else {
               setView('home')
+              router.push('/')
             }
           }}
           className="hover:bg-orange-50 -ml-2"

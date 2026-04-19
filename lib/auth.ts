@@ -12,20 +12,22 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        const email = credentials?.email?.trim().toLowerCase()
+        const password = credentials?.password
+
+        if (!email || !password) {
           throw new Error("Email et mot de passe requis")
         }
 
-        const normalizedEmail = credentials.email.trim().toLowerCase()
         const user = await db.user.findUnique({
-          where: { email: normalizedEmail },
+          where: { email },
         })
 
         if (!user) {
           throw new Error("Aucun compte trouvé avec cet email")
         }
 
-        const isPasswordValid = await compare(credentials.password, user.password)
+        const isPasswordValid = await compare(password, user.password)
 
         if (!isPasswordValid) {
           throw new Error("Mot de passe incorrect")
@@ -58,7 +60,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/connexion",
+    signIn: "/login",
   },
   session: {
     strategy: "jwt",
