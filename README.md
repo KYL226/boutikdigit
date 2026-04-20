@@ -52,7 +52,6 @@ BoutikDigit est une application Next.js 16 orientee marketplace locale: elle per
 
 ### En local
 - Demarrer l'application: `npm run dev`
-- Ouvrir [http://localhost:3000](http://localhost:3000)
 - Parcourir les routes principales:
   - `/` (accueil)
   - `/shop/[id]` (detail boutique)

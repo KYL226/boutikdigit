@@ -42,10 +42,10 @@ export default function HomeView() {
   const fetchShops = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (searchQuery) params.set('q', searchQuery)
-      if (selectedCategory) params.set('category', selectedCategory)
-      const res = await fetch(`/api/shops?${params.toString()}`)
+      const url = new URL('/api/shops', window.location.origin)
+      if (searchQuery) url.searchParams.set('q', searchQuery)
+      if (selectedCategory) url.searchParams.set('category', selectedCategory)
+      const res = await fetch(url.toString())
       if (res.ok) {
         const data = await res.json()
         setShops(data)

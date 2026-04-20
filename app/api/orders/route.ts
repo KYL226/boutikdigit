@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import type { Session } from "next-auth"
 
 // POST /api/orders - Create an order
 export async function POST(request: NextRequest) {
@@ -35,21 +36,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate products and calculate total
-    let total = 0
-    const orderItemsData = []
+    const lineItems = items as { productId: string; quantity: number }[]
 
-    for (const item of items) {
+    // Validate line items (shape) then load all products in one query
+    for (const item of lineItems) {
       if (!item.productId || !item.quantity || item.quantity <= 0) {
         return NextResponse.json(
           { error: "Chaque article doit avoir un productId et une quantité valide" },
           { status: 400 }
         )
       }
+    }
+    const productIds: string[] = [
+      ...new Set(lineItems.map((line) => line.productId)),
+    ]
+    const products = await db.product.findMany({
+      where: { id: { in: productIds } },
+    })
+    const productById = new Map(products.map((p) => [p.id, p]))
 
-      const product = await db.product.findUnique({
-        where: { id: item.productId },
-      })
+    let total = 0
+    const orderItemsData: {
+      quantity: number
+      price: number
+      productName: string
+      productId: string
+    }[] = []
+
+    for (const item of lineItems) {
+      const product = productById.get(item.productId)
 
       if (!product) {
         return NextResponse.json(
@@ -125,6 +140,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
+async function buildOrdersFilter(
+  session: Session,
+  shopIdParam: string,
+  statusParam: string
+): Promise<{ ok: true; where: Record<string, unknown> } | { ok: false; response: NextResponse }> {
+  const where: Record<string, unknown> = {}
+  const user = session.user!
+
+  if (user.role === "ADMIN") {
+    if (shopIdParam) {
+      where.shopId = shopIdParam
+    }
+  } else if (user.role === "MARCHAND") {
+    const merchantShop = await db.shop.findUnique({
+      where: { userId: user.id },
+    })
+
+    if (!merchantShop) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: "Aucune boutique trouvée pour ce marchand" },
+          { status: 404 }
+        ),
+      }
+    }
+
+    where.shopId = merchantShop.id
+  } else if (user.role === "CLIENT") {
+    where.clientId = user.id
+  }
+
+  if (statusParam) {
+    where.status = statusParam
+  }
+
+  return { ok: true, where }
+}
+
 // GET /api/orders - List orders (filtered by shopId for merchants, all for admin)
 export async function GET(request: NextRequest) {
   try {
@@ -141,38 +195,13 @@ export async function GET(request: NextRequest) {
     const shopId = searchParams.get("shopId") || ""
     const status = searchParams.get("status") || ""
 
-    const where: Record<string, unknown> = {}
-
-    if (session.user.role === "ADMIN") {
-      // Admin can see all orders
-      if (shopId) {
-        where.shopId = shopId
-      }
-    } else if (session.user.role === "MARCHAND") {
-      // Merchant sees only their shop's orders
-      const shop = await db.shop.findUnique({
-        where: { userId: session.user.id },
-      })
-
-      if (!shop) {
-        return NextResponse.json(
-          { error: "Aucune boutique trouvée pour ce marchand" },
-          { status: 404 }
-        )
-      }
-
-      where.shopId = shop.id
-    } else if (session.user.role === "CLIENT") {
-      // Client sees their own orders
-      where.clientId = session.user.id
-    }
-
-    if (status) {
-      where.status = status
+    const filter = await buildOrdersFilter(session, shopId, status)
+    if (!filter.ok) {
+      return filter.response
     }
 
     const orders = await db.order.findMany({
-      where,
+      where: filter.where,
       include: {
         items: true,
         shop: {

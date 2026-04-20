@@ -53,7 +53,7 @@ interface ShopViewProps {
   shopId?: string
 }
 
-export default function ShopView({ shopId: shopIdProp }: ShopViewProps = {}) {
+export default function ShopView({ shopId: shopIdProp }: ShopViewProps) {
   const { selectedShopId } = useAppStore()
   const router = useRouter()
   const { addItem, items, shopId: cartShopId, getItemCount } = useCartStore()

@@ -216,13 +216,13 @@ export default function DashboardView() {
 
   useEffect(() => {
     if (user?.role === 'MARCHAND') {
-      fetchShop()
+      void fetchShop()
     }
   }, [user?.role, fetchShop])
 
   useEffect(() => {
     if (shop) {
-      fetchOrders()
+      void fetchOrders()
     }
   }, [shop, fetchOrders])
 
@@ -237,7 +237,7 @@ export default function DashboardView() {
       })
       if (res.ok) {
         toast.success('Boutique mise à jour')
-        fetchShop()
+        await fetchShop()
       } else {
         toast.error('Erreur lors de la mise à jour')
       }
@@ -261,7 +261,7 @@ export default function DashboardView() {
       })
       if (res.ok) {
         toast.success('Boutique créée !')
-        fetchShop()
+        await fetchShop()
       } else {
         toast.error('Erreur lors de la création')
       }
@@ -298,7 +298,7 @@ export default function DashboardView() {
         setProductDialogOpen(false)
         setEditingProduct(null)
         setProductForm({ name: '', description: '', price: '', category: 'Alimentation', isAvailable: true })
-        fetchShop()
+        await fetchShop()
       } else {
         toast.error('Erreur lors de la sauvegarde')
       }
@@ -316,7 +316,7 @@ export default function DashboardView() {
       const res = await fetch(`/api/products/${deleteProductId}`, { method: 'DELETE' })
       if (res.ok) {
         toast.success('Produit supprimé')
-        fetchShop()
+        await fetchShop()
       } else {
         toast.error('Erreur lors de la suppression')
       }
@@ -333,7 +333,7 @@ export default function DashboardView() {
       const res = await fetch(`/api/products/${productId}`, { method: 'PATCH' })
       if (res.ok) {
         toast.success('Disponibilité mise à jour')
-        fetchShop()
+        await fetchShop()
       }
     } catch {
       toast.error('Erreur')
@@ -349,7 +349,7 @@ export default function DashboardView() {
       })
       if (res.ok) {
         toast.success('Statut mis à jour')
-        fetchOrders()
+        await fetchOrders()
       }
     } catch {
       toast.error('Erreur')

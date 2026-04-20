@@ -178,8 +178,7 @@ export default function AdminView() {
       const res = await fetch(`/api/admin/shops/${shopId}`, { method: 'PATCH' })
       if (res.ok) {
         toast.success('Statut mis à jour')
-        fetchShops()
-        fetchStats()
+        await Promise.all([fetchShops(), fetchStats()])
       }
     } catch {
       toast.error('Erreur')
