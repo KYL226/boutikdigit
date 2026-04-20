@@ -3,6 +3,39 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 
+const getShopUpdateData = (body: Record<string, unknown>) => {
+  const { name, description, whatsappNumber, image, location, city, category } = body
+  return {
+    ...(name !== undefined && { name }),
+    ...(description !== undefined && { description }),
+    ...(whatsappNumber !== undefined && { whatsappNumber }),
+    ...(image !== undefined && { image }),
+    ...(location !== undefined && { location }),
+    ...(city !== undefined && { city }),
+    ...(category !== undefined && { category }),
+  }
+}
+
+async function getAuthorizedShop(id: string, userId: string, role: string) {
+  const shop = await db.shop.findUnique({ where: { id } })
+  if (!shop) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: "Boutique non trouvée" }, { status: 404 }),
+    }
+  }
+  if (shop.userId !== userId && role !== "ADMIN") {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: "Vous n'êtes pas autorisé à modifier cette boutique" },
+        { status: 403 }
+      ),
+    }
+  }
+  return { ok: true as const, shop }
+}
+
 // GET /api/shops/[id] - Get shop by ID with products
 export async function GET(
   request: NextRequest,
@@ -66,38 +99,16 @@ export async function PUT(
 
     const { id } = await params
 
-    const shop = await db.shop.findUnique({
-      where: { id },
-    })
-
-    if (!shop) {
-      return NextResponse.json(
-        { error: "Boutique non trouvée" },
-        { status: 404 }
-      )
-    }
-
-    if (shop.userId !== session.user.id && session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Vous n'êtes pas autorisé à modifier cette boutique" },
-        { status: 403 }
-      )
+    const authorization = await getAuthorizedShop(id, session.user.id, session.user.role)
+    if (!authorization.ok) {
+      return authorization.response
     }
 
     const body = await request.json()
-    const { name, description, whatsappNumber, image, location, city, category } = body
 
     const updatedShop = await db.shop.update({
       where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(description !== undefined && { description }),
-        ...(whatsappNumber !== undefined && { whatsappNumber }),
-        ...(image !== undefined && { image }),
-        ...(location !== undefined && { location }),
-        ...(city !== undefined && { city }),
-        ...(category !== undefined && { category }),
-      },
+      data: getShopUpdateData(body),
       include: {
         user: {
           select: {

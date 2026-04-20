@@ -26,6 +26,45 @@ import {
 } from 'lucide-react'
 
 const CATEGORIES = ['Alimentation', 'Électronique', 'Mode', 'Santé', 'Services']
+const REQUIRED_STEP_2_FIELDS = ['name', 'email', 'password', 'confirmPassword'] as const
+const REQUIRED_STEP_3_FIELDS = ['shopName', 'shopWhatsappNumber', 'shopLocation', 'shopCity', 'shopCategory'] as const
+
+type RegisterFormData = {
+  name: string
+  email: string
+  password: string
+  confirmPassword: string
+  phone: string
+  whatsapp: string
+  shopName: string
+  shopDescription: string
+  shopWhatsappNumber: string
+  shopLocation: string
+  shopCity: string
+  shopCategory: string
+}
+
+const hasRequiredFields = (formData: RegisterFormData, keys: readonly (keyof RegisterFormData)[]) =>
+  keys.every((key) => Boolean(formData[key]))
+
+const getNextEnabled = (step: number, formData: RegisterFormData) => {
+  const validators: Record<number, () => boolean> = {
+    1: () => true,
+    2: () => hasRequiredFields(formData, REQUIRED_STEP_2_FIELDS),
+    3: () => hasRequiredFields(formData, REQUIRED_STEP_3_FIELDS),
+  }
+  return validators[step]?.() ?? false
+}
+
+const validatePasswordFields = (formData: RegisterFormData) => {
+  if (formData.password !== formData.confirmPassword) {
+    return 'Les mots de passe ne correspondent pas'
+  }
+  if (formData.password.length < 6) {
+    return 'Le mot de passe doit contenir au moins 6 caractères'
+  }
+  return null
+}
 
 export default function RegisterView() {
   const { setView } = useAppStore()
@@ -35,7 +74,7 @@ export default function RegisterView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [role, setRole] = useState<'CLIENT' | 'MARCHAND'>('CLIENT')
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterFormData>({
     name: '',
     email: '',
     password: '',
@@ -51,12 +90,9 @@ export default function RegisterView() {
   })
 
   const handleSubmit = async () => {
-    if (formData.password !== formData.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas')
-      return
-    }
-    if (formData.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères')
+    const passwordError = validatePasswordFields(formData)
+    if (passwordError) {
+      setError(passwordError)
       return
     }
     setError('')
@@ -92,14 +128,7 @@ export default function RegisterView() {
   }
 
   const canGoNext = () => {
-    if (step === 1) return true
-    if (step === 2) {
-      return formData.name && formData.email && formData.password && formData.confirmPassword
-    }
-    if (step === 3) {
-      return formData.shopName && formData.shopWhatsappNumber && formData.shopLocation && formData.shopCity && formData.shopCategory
-    }
-    return false
+    return getNextEnabled(step, formData)
   }
 
   return (
