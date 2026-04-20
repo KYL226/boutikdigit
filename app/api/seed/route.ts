@@ -161,7 +161,7 @@ export async function GET() {
 
     // Create products for shop 1 (Alimentation)
     const shop1Products = await Promise.all([
-      db.product.create({
+      await db.product.create({
         data: {
           name: "Riz Basmati 5kg",
           description: "Riz basmati de qualité supérieure, importé d'Inde. Parfait pour tous vos plats.",
@@ -171,7 +171,7 @@ export async function GET() {
           shopId: shop1.id,
         },
       }),
-      db.product.create({
+      await db.product.create({
         data: {
           name: "Huile de cuisson 5L",
           description: "Huile végétale pour la cuisine quotidienne. Marque de confiance.",
@@ -181,7 +181,7 @@ export async function GET() {
           shopId: shop1.id,
         },
       }),
-      db.product.create({
+      await db.product.create({
         data: {
           name: "Sucre blanc 2kg",
           description: "Sucre blanc raffiné pour vos boissons et pâtisseries.",
@@ -191,7 +191,7 @@ export async function GET() {
           shopId: shop1.id,
         },
       }),
-      db.product.create({
+      await db.product.create({
         data: {
           name: "Lait en poudre 400g",
           description: "Lait en poudre entier. Idéal pour le thé et la cuisine.",
@@ -201,7 +201,7 @@ export async function GET() {
           shopId: shop1.id,
         },
       }),
-      db.product.create({
+      await db.product.create({
         data: {
           name: "Pâtes Spaghetti 1kg",
           description: "Pâtes de qualité, cuisson rapide. Marque populaire.",

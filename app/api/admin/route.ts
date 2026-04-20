@@ -82,6 +82,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(orders)
     }
 
+    const recentOrders = await db.order.findMany({
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: {
+        shop: {
+          select: { name: true },
+        },
+        items: true,
+      },
+    })
+
     // Default: return platform stats
     const [
       totalUsers,
@@ -93,7 +104,6 @@ export async function GET(request: NextRequest) {
       confirmedOrders,
       deliveredOrders,
       cancelledOrders,
-      recentOrders,
       merchantCount,
       clientCount,
     ] = await Promise.all([
@@ -106,16 +116,6 @@ export async function GET(request: NextRequest) {
       db.order.count({ where: { status: "CONFIRMED" } }),
       db.order.count({ where: { status: "DELIVERED" } }),
       db.order.count({ where: { status: "CANCELLED" } }),
-      db.order.findMany({
-        take: 5,
-        orderBy: { createdAt: "desc" },
-        include: {
-          shop: {
-            select: { name: true },
-          },
-          items: true,
-        },
-      }),
       db.user.count({ where: { role: "MARCHAND" } }),
       db.user.count({ where: { role: "CLIENT" } }),
     ])
