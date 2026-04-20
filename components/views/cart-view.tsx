@@ -46,26 +46,26 @@ export default function CartView() {
 
   const total = getTotal()
 
-  const handleWhatsAppOrder = () => {
+  const handleWhatsAppOrder = async () => {
     if (!shopId) return
-    // Find the shop's WhatsApp number from the API or use a default
-    // For now, we'll construct the message and navigate
     const cartItems = items.map((item) => ({
       name: item.name,
       quantity: item.quantity,
       price: item.price,
     }))
-    // We need the shop phone - fetch it
-    fetch(`/api/shops/${shopId}`)
-      .then((res) => res.json())
-      .then((shop) => {
-        const link = generateWhatsAppLink(shop.whatsappNumber, cartItems, shopName || shop.name)
-        window.open(link, '_blank')
-        toast.success('Redirection vers WhatsApp...')
-      })
-      .catch(() => {
-        toast.error('Erreur lors de la génération du lien WhatsApp')
-      })
+    try {
+      const res = await fetch(`/api/shops/${shopId}`)
+      if (!res.ok) {
+        toast.error('Erreur lors de la récupération de la boutique')
+        return
+      }
+      const shop = await res.json()
+      const link = generateWhatsAppLink(shop.whatsappNumber, cartItems, shopName || shop.name)
+      window.open(link, '_blank')
+      toast.success('Redirection vers WhatsApp...')
+    } catch {
+      toast.error('Erreur lors de la génération du lien WhatsApp')
+    }
   }
 
   const handlePlatformOrder = async () => {

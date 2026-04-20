@@ -97,8 +97,9 @@ function SidebarProvider({
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const isShortcutKey = event.key.localeCompare(SIDEBAR_KEYBOARD_SHORTCUT) === 0
       if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+        isShortcutKey &&
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
