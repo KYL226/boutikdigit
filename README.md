@@ -11,24 +11,36 @@ BoutikDigit est une application Next.js 16 orientee marketplace locale: elle per
 
 ### Etapes
 1. Cloner le projet et ouvrir le dossier.
-2. Installer les dependances:
-   - `npm install`
-3. Configurer les variables d'environnement dans `.env` (au minimum `DATABASE_URL` et les variables NextAuth).
-4. Generer le client Prisma:
-   - `npm run db:generate`
-5. Synchroniser la base:
-   - `npm run db:push`
-6. Lancer le serveur de dev:
-   - `npm run dev`
+2. Installer les dependances: `npm install`
+3. Copier le modele de configuration des variables: copier `.env.example` en `.env` (PowerShell: `Copy-Item .env.example .env` ; macOS/Linux: `cp .env.example .env`), puis remplir les valeurs (voir [Variables d'environnement](#variables-denvironnement) ci-dessous).
+4. Generer le client Prisma: `npm run db:generate`
+5. Synchroniser la base: `npm run db:push`
+6. Lancer le serveur de dev: `npm run dev`
+
+### Variables d'environnement
+
+Le detail par variable est dans **`.env.example`**. Synthese:
+
+| Variable | Obligatoire | Role |
+|----------|------------|------|
+| `DATABASE_URL` | Oui (Prisma) | Chaine de connexion MySQL pour Prisma. |
+| `NEXTAUTH_URL` | Fortement conseille (NextAuth) | URL publique de l'application (ex. `http://localhost:3000` en local, ou l'URL HTTPS en production). |
+| `NEXTAUTH_SECRET` | Oui en production | Secret de signature des sessions / JWT NextAuth. Generer une valeur aleatoire longue (ex. `openssl rand -base64 32`). En dev, une valeur de secours existe dans le code si la variable est absente. |
+| `CLOUDINARY_CLOUD_NAME` | Oui si uploads images | Compte [Cloudinary](https://cloudinary.com/) : logo, banniere boutique, photos produit via le dashboard marchand. |
+| `CLOUDINARY_API_KEY` | Oui si uploads | Cle API Cloudinary. |
+| `CLOUDINARY_API_SECRET` | Oui si uploads | Secret API Cloudinary. |
+
+Sans les trois variables Cloudinary, l'app fonctionne (catalogue, commandes, avis) mais **les routes d'upload d'images** echoueront.
 
 ## Etat actuel du projet
 
 ### Stack technique
-- Framework: `Next.js 16` (App Router) + `React 19` + `TypeScript`
+- Framework: `Next.js` (App Router) + `React` + `TypeScript`
 - UI: `Tailwind CSS v4`, composants `shadcn/ui` (Radix), `framer-motion`, `sonner`
 - Donnees: `Prisma` + `MySQL`
-- Authentification: `next-auth` (credentials)
-- State management: `Zustand` (app/auth/cart/favorites)
+- Authentification: `next-auth` (credentials, sessions JWT)
+- Medias: `Cloudinary` (uploads logo / banniere / images produit, dossier `boutikdigit/{boutique}/`)
+- State management: `Zustand` (app, auth, panier, favoris)
 
 ### Structure actuelle (apres reorganisation)
 - `app/`: dossier principal App Router a la racine
@@ -44,9 +56,10 @@ BoutikDigit est une application Next.js 16 orientee marketplace locale: elle per
 
 ### Fonctionnement applicatif principal
 - L'interface cliente principale est rendue via `app/page.tsx`.
-- La navigation principale est maintenant exposee via des routes App Router (`/`, `/shop/[id]`, `/cart`, `/favorites`, `/orders`, `/dashboard`, `/admin`, `/login`, `/register`), avec conservation du store pour l'etat UI/metier.
-- Les donnees sont consommees via les endpoints `app/api/*`.
-- Le modele de donnees Prisma couvre users, shops, products, orders et orderItems.
+- Routes App Router: `/`, `/shop/[id]`, `/cart`, `/favorites`, `/orders`, `/dashboard` (marchand), `/admin`, `/login`, `/register` ; etat partage via Zustand.
+- Donnees et actions via `app/api/*` (commandes, promotions, avis, uploads).
+- Prisma: utilisateurs, boutiques (logo, banniere), produits, images produit, commandes, codes promo, avis boutique et avis produit.
+- Checkout: champ code promo, validation cote `POST /api/orders` avec remise sur le total.
 
 ## Usage
 
@@ -74,13 +87,16 @@ BoutikDigit est une application Next.js 16 orientee marketplace locale: elle per
 Les endpoints sont exposes via App Router dans `app/api/**/route.ts`.
 
 ### Endpoints principaux
-- `POST /api/auth/register` : inscription utilisateur
-- `GET/POST /api/auth/[...nextauth]` : authentification NextAuth (credentials/session)
-- `GET /api/shops` : liste des boutiques
-- `GET /api/products` : liste/consultation des produits
-- `GET/POST /api/orders` : gestion des commandes
-- `GET /api/admin` : statistiques/operations d'administration
-- `GET /api/seed` : seed de donnees (usage dev)
+- `POST /api/auth/register` : inscription
+- `GET/POST /api/auth/[...nextauth]` : NextAuth (session / credentials)
+- `GET /api/shops` , `GET/PATCH/DELETE /api/shops/[id]` : boutiques
+- `GET/POST /api/products` , `GET/PATCH/DELETE /api/products/[id]` : produits
+- `GET/POST /api/orders` : commandes (support `promoCode` dans le corps POST)
+- `GET/POST /api/promotions` : codes promo (marchand)
+- `GET/POST /api/reviews/shops` , `GET/POST /api/reviews/products` : avis
+- `POST /api/uploads/cloudinary` : upload d'image (marchand / admin, base64)
+- `GET /api/admin` : admin
+- `GET /api/seed` : donnees de test (dev)
 
 ### Bonnes pratiques recommandees
 - Valider toutes les entrees (Zod)

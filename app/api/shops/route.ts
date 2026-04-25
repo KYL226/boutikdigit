@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { DEFAULT_BANNER_DATA_URI, buildInitialsAvatar } from "@/lib/media"
 
 // GET /api/shops - List all active shops with optional search and category filter
 export async function GET(request: NextRequest) {
@@ -40,13 +41,30 @@ export async function GET(request: NextRequest) {
           },
         },
         _count: {
-          select: { products: true },
+          select: { products: true, reviews: true },
+        },
+        reviews: {
+          select: { rating: true },
         },
       },
       orderBy: { createdAt: "desc" },
     })
 
-    return NextResponse.json(shops)
+    const normalized = shops.map((shop) => {
+      const avgRating =
+        shop.reviews.length > 0
+          ? shop.reviews.reduce((acc, r) => acc + r.rating, 0) / shop.reviews.length
+          : null
+      return {
+        ...shop,
+        logoUrl: shop.logoUrl || shop.image || null,
+        bannerUrl: shop.bannerUrl || DEFAULT_BANNER_DATA_URI,
+        logoFallback: !shop.logoUrl && !shop.image ? buildInitialsAvatar(shop.name) : null,
+        rating: avgRating,
+      }
+    })
+
+    return NextResponse.json(normalized)
   } catch (error) {
     console.error("Erreur lors de la récupération des boutiques:", error)
     return NextResponse.json(
@@ -76,7 +94,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, whatsappNumber, image, location, city, category } = body
+    const { name, description, whatsappNumber, image, logoUrl, bannerUrl, location, city, category } = body
 
     if (!name || !whatsappNumber || !location || !city) {
       return NextResponse.json(
@@ -103,6 +121,8 @@ export async function POST(request: NextRequest) {
         description: description || "",
         whatsappNumber,
         image: image || null,
+        logoUrl: logoUrl || image || null,
+        bannerUrl: bannerUrl || null,
         location,
         city,
         category: category || "General",

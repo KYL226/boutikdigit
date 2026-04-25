@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  webpack: (config, { dev }) => {
+    if (dev) {
+      // Évite certains crashs mémoire/pack cache sur Windows (RangeError: Array buffer allocation failed)
+      config.cache = false
+    }
+    return config
+  },
 };
 
 export default nextConfig;

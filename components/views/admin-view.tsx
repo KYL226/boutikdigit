@@ -8,7 +8,6 @@ import { formatPrice, formatDate, getCategoryIcon, getCategoryColor, getStatusCo
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import {
@@ -130,6 +129,7 @@ export default function AdminView() {
   const [users, setUsers] = useState<UserData[]>([])
   const [shops, setShops] = useState<ShopData[]>([])
   const [loading, setLoading] = useState(false)
+  const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'shops'>('overview')
 
   const fetchStats = async () => {
     try {
@@ -250,134 +250,152 @@ export default function AdminView() {
         </Badge>
       </div>
 
-      <MainStats
-        stats={stats}
-        totalUsers={totalUsers}
-        merchantCount={merchantCount}
-        clientCount={clientCount}
-      />
+      <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+        <aside className="rounded-xl border bg-white p-3 h-fit lg:sticky lg:top-20">
+          <p className="text-xs font-semibold text-muted-foreground px-2 pb-2">Navigation admin</p>
+          <div className="space-y-1">
+            <Button
+              variant={activeSection === 'overview' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('overview')}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" /> Vue d&apos;ensemble
+            </Button>
+            <Button
+              variant={activeSection === 'users' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('users')}
+            >
+              <Users className="h-4 w-4 mr-2" /> Utilisateurs ({users.length})
+            </Button>
+            <Button
+              variant={activeSection === 'shops' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('shops')}
+            >
+              <Store className="h-4 w-4 mr-2" /> Boutiques ({shops.length})
+            </Button>
+          </div>
+        </aside>
 
-      {/* Order Stats + Category Chart */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Orders by Status */}
-        <Card className="shadow-sm border-0">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-orange-500" />
-              Commandes par statut
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {stats && [
-              { label: 'En attente', value: stats.ordersByStatus.PENDING, color: 'bg-yellow-400', textColor: 'text-yellow-700' },
-              { label: 'Confirmées', value: stats.ordersByStatus.CONFIRMED, color: 'bg-blue-400', textColor: 'text-blue-700' },
-              { label: 'Livrées', value: stats.ordersByStatus.DELIVERED, color: 'bg-green-400', textColor: 'text-green-700' },
-              { label: 'Annulées', value: stats.ordersByStatus.CANCELLED, color: 'bg-red-400', textColor: 'text-red-700' },
-            ].map((item) => (
-              <div key={item.label} className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className={item.textColor}>{item.label}</span>
-                  <span className="font-semibold">{item.value}</span>
-                </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${item.color} rounded-full transition-all duration-500`}
-                    style={{ width: `${(item.value / maxOrderStatus) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-            <Separator />
-            <div className="flex items-center justify-between text-sm font-semibold">
-              <span>Total</span>
-              <span className="text-orange-600">{totalOrders}</span>
-            </div>
-          </CardContent>
-        </Card>
+        <section className="space-y-4">
+        {activeSection === 'overview' ? (
+          <>
+            <MainStats
+              stats={stats}
+              totalUsers={totalUsers}
+              merchantCount={merchantCount}
+              clientCount={clientCount}
+            />
 
-        {/* Category Distribution */}
-        <Card className="shadow-sm border-0">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Store className="h-4 w-4 text-emerald-500" />
-              Boutiques par catégorie
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {stats?.categoryDistribution.map((cat) => (
-              <div key={cat.category} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge className={`${getCategoryColor(cat.category)} text-xs`}>
-                    {getCategoryIcon(cat.category)} {cat.category}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full"
-                      style={{ width: `${(cat._count.category / (stats?.totalShops || 1)) * 100}%` }}
-                    />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="shadow-sm border-0">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-orange-500" />
+                    Commandes par statut
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {stats && [
+                    { label: 'En attente', value: stats.ordersByStatus.PENDING, color: 'bg-yellow-400', textColor: 'text-yellow-700' },
+                    { label: 'Confirmées', value: stats.ordersByStatus.CONFIRMED, color: 'bg-blue-400', textColor: 'text-blue-700' },
+                    { label: 'Livrées', value: stats.ordersByStatus.DELIVERED, color: 'bg-green-400', textColor: 'text-green-700' },
+                    { label: 'Annulées', value: stats.ordersByStatus.CANCELLED, color: 'bg-red-400', textColor: 'text-red-700' },
+                  ].map((item) => (
+                    <div key={item.label} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className={item.textColor}>{item.label}</span>
+                        <span className="font-semibold">{item.value}</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${item.color} rounded-full transition-all duration-500`}
+                          style={{ width: `${(item.value / maxOrderStatus) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <Separator />
+                  <div className="flex items-center justify-between text-sm font-semibold">
+                    <span>Total</span>
+                    <span className="text-orange-600">{totalOrders}</span>
                   </div>
-                  <span className="text-sm font-semibold w-6 text-right">{cat._count.category}</span>
-                </div>
-              </div>
-            ))}
-            {(!stats?.categoryDistribution || stats.categoryDistribution.length === 0) && (
-              <p className="text-sm text-muted-foreground text-center py-4">Aucune donnée</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                </CardContent>
+              </Card>
 
-      {/* Quick Stats Row */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-yellow-50 to-amber-50">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-yellow-600" />
+              <Card className="shadow-sm border-0">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Store className="h-4 w-4 text-emerald-500" />
+                    Boutiques par catégorie
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {stats?.categoryDistribution.map((cat) => (
+                    <div key={cat.category} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${getCategoryColor(cat.category)} text-xs`}>
+                          {getCategoryIcon(cat.category)} {cat.category}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full"
+                            style={{ width: `${(cat._count.category / (stats?.totalShops || 1)) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold w-6 text-right">{cat._count.category}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {(!stats?.categoryDistribution || stats.categoryDistribution.length === 0) && (
+                    <p className="text-sm text-muted-foreground text-center py-4">Aucune donnée</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">En attente</p>
-              <p className="text-lg font-bold text-yellow-600">{stats?.pendingOrders || 0}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-green-50 to-emerald-50">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Livrées</p>
-              <p className="text-lg font-bold text-green-600">{stats?.deliveredOrders || 0}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-gradient-to-br from-red-50 to-pink-50">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-              <XCircle className="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Annulées</p>
-              <p className="text-lg font-bold text-red-600">{stats?.cancelledOrders || 0}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger value="users" className="gap-1">
-            <Users className="h-4 w-4" /> Utilisateurs ({users.length})
-          </TabsTrigger>
-          <TabsTrigger value="shops" className="gap-1">
-            <Store className="h-4 w-4" /> Boutiques ({shops.length})
-          </TabsTrigger>
-        </TabsList>
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="shadow-sm border-0 bg-gradient-to-br from-yellow-50 to-amber-50">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">En attente</p>
+                    <p className="text-lg font-bold text-yellow-600">{stats?.pendingOrders || 0}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm border-0 bg-gradient-to-br from-green-50 to-emerald-50">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Livrées</p>
+                    <p className="text-lg font-bold text-green-600">{stats?.deliveredOrders || 0}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm border-0 bg-gradient-to-br from-red-50 to-pink-50">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Annulées</p>
+                    <p className="text-lg font-bold text-red-600">{stats?.cancelledOrders || 0}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        ) : null}
 
-        {/* Users Tab */}
-        <TabsContent value="users">
+        {activeSection === 'users' ? (
           <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
             {users.map((u) => {
               const roleBadge = getRoleBadge(u.role)
@@ -407,10 +425,9 @@ export default function AdminView() {
               )
             })}
           </div>
-        </TabsContent>
+        ) : null}
 
-        {/* Shops Tab */}
-        <TabsContent value="shops">
+        {activeSection === 'shops' ? (
           <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
             {shops.map((s) => (
               <Card key={s.id} className={`shadow-sm border-0 ${!s.isActive ? 'opacity-60' : ''}`}>
@@ -471,8 +488,9 @@ export default function AdminView() {
               </Card>
             ))}
           </div>
-        </TabsContent>
-      </Tabs>
+        ) : null}
+        </section>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useAuthStore } from '@/store/auth-store'
@@ -46,8 +46,16 @@ export default function Header() {
   const { getItemCount } = useCartStore()
   const { getCount: getFavCount } = useFavoritesStore()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const itemCount = getItemCount()
-  const favCount = getFavCount()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Évite les "hydration mismatch" avec Zustand persist (localStorage),
+  // car le serveur ne connaît pas le panier/favoris du navigateur.
+  const itemCount = mounted ? getItemCount() : 0
+  const favCount = mounted ? getFavCount() : 0
 
   const navItems: NavItem[] = [
     { label: 'Accueil', view: 'home', path: '/', icon: Store },

@@ -8,7 +8,7 @@ import type { Session } from "next-auth"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { shopId, customerName, customerPhone, customerNote, deliveryAddress, items, clientId } = body
+    const { shopId, customerName, customerPhone, customerNote, deliveryAddress, items, clientId, promoCode } = body
 
     if (!shopId || !customerName || !customerPhone || !items || items.length === 0) {
       return NextResponse.json(
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     })
     const productById = new Map(products.map((p) => [p.id, p]))
 
-    let total = 0
+    let subtotal = 0
     const orderItemsData: {
       quantity: number
       price: number
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       }
 
       const itemTotal = product.price * item.quantity
-      total += itemTotal
+      subtotal += itemTotal
 
       orderItemsData.push({
         quantity: item.quantity,
@@ -103,6 +103,60 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (session?.user && session.user.role === "CLIENT") {
       orderClientId = session.user.id
+    }
+
+    let total = subtotal
+    let appliedPromotion: { code: string; discount: number } | null = null
+
+    if (promoCode) {
+      const normalizedCode = String(promoCode).trim().toUpperCase()
+      const now = new Date()
+      const promo = await db.promoCode.findFirst({
+        where: {
+          code: normalizedCode,
+          shopId,
+          isActive: true,
+          OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+          AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
+        },
+        include: {
+          products: {
+            select: { productId: true },
+          },
+        },
+      })
+
+      if (!promo) {
+        return NextResponse.json({ error: "Code promo invalide ou expiré" }, { status: 400 })
+      }
+
+      if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
+        return NextResponse.json({ error: "Ce code promo a atteint sa limite d'utilisation" }, { status: 400 })
+      }
+
+      const scopedProductIds = new Set(promo.products.map((p) => p.productId))
+      const scopedSubtotal =
+        scopedProductIds.size === 0
+          ? subtotal
+          : orderItemsData.reduce((acc, li) => (scopedProductIds.has(li.productId) ? acc + li.price * li.quantity : acc), 0)
+
+      if (scopedProductIds.size > 0 && scopedSubtotal <= 0) {
+        return NextResponse.json(
+          { error: "Ce code promo ne s'applique à aucun produit du panier" },
+          { status: 400 }
+        )
+      }
+
+      const discountByPercent = promo.discountPercent ? (scopedSubtotal * promo.discountPercent) / 100 : 0
+      const discountByAmount = promo.discountAmount || 0
+      const discount = Math.max(discountByPercent, discountByAmount)
+      total = Math.max(0, subtotal - discount)
+      appliedPromotion = { code: promo.code, discount }
+
+      await db.promoCode.update({
+        where: { id: promo.id },
+        data: { usedCount: { increment: 1 } },
+      })
     }
 
     const order = await db.order.create({
@@ -130,7 +184,15 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(order, { status: 201 })
+    return NextResponse.json(
+      {
+        ...order,
+        subtotal,
+        discount: appliedPromotion?.discount || 0,
+        promoCode: appliedPromotion?.code || null,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error("Erreur lors de la création de la commande:", error)
     return NextResponse.json(

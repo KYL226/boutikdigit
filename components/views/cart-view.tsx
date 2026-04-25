@@ -29,6 +29,7 @@ import {
   ShoppingCart,
   Send,
   Loader2,
+  TicketPercent,
 } from 'lucide-react'
 
 export default function CartView() {
@@ -37,6 +38,10 @@ export default function CartView() {
   const { items, shopId, shopName, removeItem, updateQuantity, clearCart, getTotal } = useCartStore()
   const [orderDialogOpen, setOrderDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [promoCode, setPromoCode] = useState('')
+  const [promoDiscount, setPromoDiscount] = useState(0)
+  const [promoAppliedCode, setPromoAppliedCode] = useState<string | null>(null)
+  const [applyingPromo, setApplyingPromo] = useState(false)
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',
@@ -45,6 +50,7 @@ export default function CartView() {
   })
 
   const total = getTotal()
+  const finalTotal = Math.max(0, total - promoDiscount)
 
   const handleWhatsAppOrder = async () => {
     if (!shopId) return
@@ -89,6 +95,7 @@ export default function CartView() {
             productId: item.productId,
             quantity: item.quantity,
           })),
+          promoCode: promoAppliedCode || undefined,
         }),
       })
 
@@ -106,6 +113,42 @@ export default function CartView() {
       toast.error('Erreur de connexion')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleApplyPromo = async () => {
+    if (!shopId || !promoCode.trim()) {
+      toast.error('Veuillez entrer un code promo')
+      return
+    }
+    setApplyingPromo(true)
+    try {
+      const code = promoCode.trim().toUpperCase()
+      const res = await fetch(`/api/promotions?shopId=${shopId}&code=${code}`)
+      if (!res.ok) {
+        toast.error('Code promo invalide')
+        setPromoDiscount(0)
+        setPromoAppliedCode(null)
+        return
+      }
+      const promos = await res.json()
+      const promo = promos?.[0]
+      if (!promo) {
+        toast.error('Code promo invalide ou expiré')
+        setPromoDiscount(0)
+        setPromoAppliedCode(null)
+        return
+      }
+      const discountByPercent = promo.discountPercent ? (total * promo.discountPercent) / 100 : 0
+      const discountByAmount = promo.discountAmount || 0
+      const discount = Math.max(discountByPercent, discountByAmount)
+      setPromoDiscount(discount)
+      setPromoAppliedCode(code)
+      toast.success(`Code ${code} appliqué`)
+    } catch {
+      toast.error('Erreur lors de la vérification du code promo')
+    } finally {
+      setApplyingPromo(false)
     }
   }
 
@@ -252,9 +295,36 @@ export default function CartView() {
                 </div>
               ))}
               <Separator />
+              <div className="space-y-2">
+                <Label htmlFor="promo">Code promo</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="promo"
+                    placeholder="EX: WELCOME10"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleApplyPromo}
+                    disabled={applyingPromo}
+                  >
+                    {applyingPromo ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Appliquer'}
+                  </Button>
+                </div>
+              </div>
+              {promoAppliedCode ? (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span className="flex items-center gap-1">
+                    <TicketPercent className="h-4 w-4" /> Promo {promoAppliedCode}
+                  </span>
+                  <span>-{formatPrice(promoDiscount)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between text-base font-bold">
                 <span>Total</span>
-                <span className="text-orange-600">{formatPrice(total)}</span>
+                <span className="text-orange-600">{formatPrice(finalTotal)}</span>
               </div>
 
               {/* WhatsApp Order Button */}
@@ -327,9 +397,21 @@ export default function CartView() {
                       />
                     </div>
                     <div className="bg-orange-50 rounded-lg p-3">
+                      {promoAppliedCode ? (
+                        <div className="flex justify-between text-sm mb-1">
+                          <span>Sous-total</span>
+                          <span>{formatPrice(total)}</span>
+                        </div>
+                      ) : null}
+                      {promoAppliedCode ? (
+                        <div className="flex justify-between text-sm text-green-600 mb-1">
+                          <span>Promo ({promoAppliedCode})</span>
+                          <span>-{formatPrice(promoDiscount)}</span>
+                        </div>
+                      ) : null}
                       <div className="flex justify-between text-sm font-semibold">
                         <span>Total</span>
-                        <span className="text-orange-600">{formatPrice(total)}</span>
+                        <span className="text-orange-600">{formatPrice(finalTotal)}</span>
                       </div>
                     </div>
                     <Button

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { buildInitialsAvatar } from "@/lib/media"
 
 // GET /api/products/[id] - Get product by ID
 export async function GET(
@@ -14,6 +15,10 @@ export async function GET(
     const product = await db.product.findUnique({
       where: { id },
       include: {
+        images: true,
+        reviews: {
+          select: { rating: true },
+        },
         shop: {
           select: {
             id: true,
@@ -33,7 +38,16 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(product)
+    const avgRating =
+      product.reviews.length > 0
+        ? product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length
+        : null
+    return NextResponse.json({
+      ...product,
+      primaryImage: product.images[0]?.url || product.image || null,
+      imageFallback: !product.images[0]?.url && !product.image ? buildInitialsAvatar(product.name) : null,
+      rating: avgRating,
+    })
   } catch (error) {
     console.error("Erreur lors de la récupération du produit:", error)
     return NextResponse.json(
@@ -80,7 +94,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, description, price, image, isAvailable, category } = body
+    const { name, description, price, image, imageUrls, isAvailable, category } = body
 
     if (price !== undefined && price <= 0) {
       return NextResponse.json(
@@ -96,10 +110,21 @@ export async function PUT(
         ...(description !== undefined && { description }),
         ...(price !== undefined && { price: Number(price) }),
         ...(image !== undefined && { image }),
+        ...(imageUrls !== undefined && {
+          images: {
+            deleteMany: {},
+            create: Array.isArray(imageUrls)
+              ? imageUrls
+                  .filter((url: unknown) => typeof url === "string" && url.trim().length > 0)
+                  .map((url: string) => ({ url }))
+              : [],
+          },
+        }),
         ...(isAvailable !== undefined && { isAvailable }),
         ...(category !== undefined && { category }),
       },
       include: {
+        images: true,
         shop: {
           select: {
             id: true,
