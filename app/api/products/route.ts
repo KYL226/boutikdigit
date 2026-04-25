@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { buildInitialsAvatar } from "@/lib/media"
 
 // GET /api/products - List products with optional shopId filter
 export async function GET(request: NextRequest) {
@@ -28,6 +29,10 @@ export async function GET(request: NextRequest) {
     const products = await db.product.findMany({
       where,
       include: {
+        images: true,
+        reviews: {
+          select: { rating: true },
+        },
         shop: {
           select: {
             id: true,
@@ -41,7 +46,20 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     })
 
-    return NextResponse.json(products)
+    const normalized = products.map((product) => {
+      const avgRating =
+        product.reviews.length > 0
+          ? product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length
+          : null
+      return {
+        ...product,
+        primaryImage: product.images[0]?.url || product.image || null,
+        imageFallback: !product.images[0]?.url && !product.image ? buildInitialsAvatar(product.name) : null,
+        rating: avgRating,
+      }
+    })
+
+    return NextResponse.json(normalized)
   } catch (error) {
     console.error("Erreur lors de la récupération des produits:", error)
     return NextResponse.json(
@@ -71,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, price, image, isAvailable, category, shopId } = body
+    const { name, description, price, image, imageUrls, isAvailable, category, shopId } = body
 
     if (!name || price === undefined || !shopId) {
       return NextResponse.json(
@@ -112,11 +130,19 @@ export async function POST(request: NextRequest) {
         description: description || "",
         price: Number(price),
         image: image || null,
+        images: Array.isArray(imageUrls)
+          ? {
+              create: imageUrls
+                .filter((url: unknown) => typeof url === "string" && url.trim().length > 0)
+                .map((url: string) => ({ url })),
+            }
+          : undefined,
         isAvailable: isAvailable !== undefined ? isAvailable : true,
         category: category || "General",
         shopId,
       },
       include: {
+        images: true,
         shop: {
           select: {
             id: true,

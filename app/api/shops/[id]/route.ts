@@ -1,19 +1,35 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
+import type { Prisma } from "@prisma/client"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { DEFAULT_BANNER_DATA_URI, buildInitialsAvatar } from "@/lib/media"
 
-const getShopUpdateData = (body: Record<string, unknown>) => {
-  const { name, description, whatsappNumber, image, location, city, category } = body
-  return {
-    ...(name !== undefined && { name }),
-    ...(description !== undefined && { description }),
-    ...(whatsappNumber !== undefined && { whatsappNumber }),
-    ...(image !== undefined && { image }),
-    ...(location !== undefined && { location }),
-    ...(city !== undefined && { city }),
-    ...(category !== undefined && { category }),
-  }
+/** Corps attendu pour PUT /api/shops/[id] — typé pour Prisma (évite unknown / Record) */
+type ShopUpdateBody = {
+  name?: string
+  description?: string
+  whatsappNumber?: string
+  image?: string | null
+  logoUrl?: string | null
+  bannerUrl?: string | null
+  location?: string
+  city?: string
+  category?: string
+}
+
+function getShopUpdateData(body: ShopUpdateBody): Prisma.ShopUpdateInput {
+  const data: Prisma.ShopUpdateInput = {}
+  if (body.name !== undefined) data.name = body.name
+  if (body.description !== undefined) data.description = body.description
+  if (body.whatsappNumber !== undefined) data.whatsappNumber = body.whatsappNumber
+  if (body.image !== undefined) data.image = body.image
+  if (body.logoUrl !== undefined) data.logoUrl = body.logoUrl
+  if (body.bannerUrl !== undefined) data.bannerUrl = body.bannerUrl
+  if (body.location !== undefined) data.location = body.location
+  if (body.city !== undefined) data.city = body.city
+  if (body.category !== undefined) data.category = body.category
+  return data
 }
 
 async function getAuthorizedShop(id: string, userId: string, role: string) {
@@ -58,9 +74,18 @@ export async function GET(
         },
         products: {
           orderBy: { createdAt: "desc" },
+          include: {
+            images: true,
+            reviews: {
+              select: { rating: true },
+            },
+          },
         },
         _count: {
-          select: { orders: true },
+          select: { orders: true, reviews: true },
+        },
+        reviews: {
+          select: { rating: true },
         },
       },
     })
@@ -72,7 +97,31 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(shop)
+    const averageShopRating =
+      shop.reviews.length > 0
+        ? shop.reviews.reduce((acc, r) => acc + r.rating, 0) / shop.reviews.length
+        : null
+
+    return NextResponse.json({
+      ...shop,
+      logoUrl: shop.logoUrl || shop.image || null,
+      bannerUrl: shop.bannerUrl || DEFAULT_BANNER_DATA_URI,
+      logoFallback: !shop.logoUrl && !shop.image ? buildInitialsAvatar(shop.name) : null,
+      rating: averageShopRating,
+      products: shop.products.map((product) => {
+        const productAverage =
+          product.reviews.length > 0
+            ? product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length
+            : null
+        return {
+          ...product,
+          images: product.images,
+          primaryImage: product.images[0]?.url || product.image || null,
+          imageFallback: !product.images[0]?.url && !product.image ? buildInitialsAvatar(product.name) : null,
+          rating: productAverage,
+        }
+      }),
+    })
   } catch (error) {
     console.error("Erreur lors de la récupération de la boutique:", error)
     return NextResponse.json(
@@ -104,7 +153,7 @@ export async function PUT(
       return authorization.response
     }
 
-    const body = await request.json()
+    const body = (await request.json()) as ShopUpdateBody
 
     const updatedShop = await db.shop.update({
       where: { id },

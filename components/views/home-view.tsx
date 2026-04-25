@@ -20,6 +20,9 @@ interface Shop {
   description: string
   whatsappNumber: string
   image?: string
+  logoUrl?: string | null
+  bannerUrl?: string | null
+  logoFallback?: { type: 'initials'; initials: string } | null
   location: string
   city: string
   category: string
@@ -204,8 +207,31 @@ export default function HomeView() {
               onClick={() => handleShopClick(shop.id)}
             >
               {/* Shop Image/Header */}
-              <div className={`h-32 bg-gradient-to-br ${getShopColor(shop.name)} flex items-center justify-center relative`}>
-                <span className="text-5xl font-bold text-white/80">{shop.name.charAt(0)}</span>
+              <div className={`h-32 bg-gradient-to-br ${getShopColor(shop.name)} relative overflow-hidden`}>
+                {shop.bannerUrl ? (
+                  <img
+                    src={shop.bannerUrl}
+                    alt={`Bannière ${shop.name}`}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-black/25" />
+
+                {/* Identité boutique (logo + nom) */}
+                <div className="relative z-10 h-full flex flex-col items-center justify-center gap-2 px-4">
+                  <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/20 overflow-hidden flex items-center justify-center shadow-lg">
+                    {shop.logoUrl ? (
+                      <img src={shop.logoUrl} alt={`Logo ${shop.name}`} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xl font-bold text-white">
+                        {shop.logoFallback?.initials || shop.name.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-white font-semibold text-sm text-center truncate w-full drop-shadow">
+                    {shop.name}
+                  </p>
+                </div>
                 <Badge className={`absolute top-3 left-3 ${getCategoryColor(shop.category)} text-xs`}>
                   {getCategoryIcon(shop.category)} {shop.category}
                 </Badge>

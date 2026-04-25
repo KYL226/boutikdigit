@@ -11,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
@@ -57,6 +56,8 @@ interface ShopData {
   name: string
   description: string
   whatsappNumber: string
+  logoUrl?: string | null
+  bannerUrl?: string | null
   location: string
   city: string
   category: string
@@ -70,8 +71,24 @@ interface ProductData {
   description: string
   price: number
   image?: string
+  images?: { url: string }[]
   isAvailable: boolean
   category: string
+}
+
+interface PromoData {
+  id: string
+  code: string
+  description?: string | null
+  discountPercent?: number | null
+  discountAmount?: number | null
+  startsAt?: string | null
+  endsAt?: string | null
+  usageLimit?: number | null
+  usedCount?: number | null
+  isActive: boolean
+  products?: { productId: string }[]
+  createdAt?: string
 }
 
 interface OrderData {
@@ -151,12 +168,16 @@ export default function DashboardView() {
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [activeSection, setActiveSection] = useState<'overview' | 'products' | 'orders' | 'shop' | 'promos'>('overview')
+  const [promos, setPromos] = useState<PromoData[]>([])
 
   // Shop form
   const [shopForm, setShopForm] = useState({
     name: '',
     description: '',
     whatsappNumber: '',
+    logoUrl: '',
+    bannerUrl: '',
     location: '',
     city: '',
     category: '',
@@ -167,8 +188,22 @@ export default function DashboardView() {
     name: '',
     description: '',
     price: '',
+    imageUrls: [] as string[],
     category: 'Alimentation',
     isAvailable: true,
+  })
+
+  // Promo form
+  const [promoForm, setPromoForm] = useState({
+    code: '',
+    description: '',
+    discountPercent: '',
+    discountAmount: '',
+    usageLimit: '',
+    startsAt: '',
+    endsAt: '',
+    scope: 'shop' as 'shop' | 'products',
+    productIds: [] as string[],
   })
 
   const fetchShop = useCallback(async () => {
@@ -187,6 +222,8 @@ export default function DashboardView() {
               name: data.name,
               description: data.description || '',
               whatsappNumber: data.whatsappNumber,
+              logoUrl: data.logoUrl || data.image || '',
+              bannerUrl: data.bannerUrl || '',
               location: data.location,
               city: data.city,
               category: data.category,
@@ -214,6 +251,115 @@ export default function DashboardView() {
     }
   }, [shop?.id])
 
+  const fetchPromos = useCallback(async () => {
+    if (!shop) return
+    try {
+      const res = await fetch(`/api/promotions?shopId=${shop.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setPromos(data)
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+    }
+  }, [shop?.id])
+
+  const fileToDataUri = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(new Error('Erreur de lecture du fichier'))
+      reader.readAsDataURL(file)
+    })
+
+  const uploadShopAsset = async (file: File, kind: 'logo' | 'banner') => {
+    if (!shop) {
+      toast.error('Créez d’abord la boutique avant de téléverser des images')
+      return
+    }
+    setSaving(true)
+    try {
+      const dataUri = await fileToDataUri(file)
+      const res = await fetch('/api/uploads/cloudinary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUri, shopId: shop.id, kind }),
+      })
+      const payload = await res.json()
+      if (!res.ok) {
+        toast.error(payload.error || 'Échec de l’upload')
+        return
+      }
+      const url = String(payload.url || '')
+      if (!url) {
+        toast.error("Upload OK mais URL manquante")
+        return
+      }
+
+      // Mise à jour immédiate en DB pour que ça apparaisse tout de suite côté boutique.
+      const updateRes = await fetch(`/api/shops/${shop.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(kind === 'logo' ? { logoUrl: url } : { bannerUrl: url }),
+      })
+      if (!updateRes.ok) {
+        const err = await updateRes.json().catch(() => ({}))
+        toast.error(err?.error || "Image uploadée mais sauvegarde boutique échouée")
+        // On garde au moins l'aperçu local
+        if (kind === 'logo') setShopForm((prev) => ({ ...prev, logoUrl: url }))
+        else setShopForm((prev) => ({ ...prev, bannerUrl: url }))
+        return
+      }
+
+      const updated = await updateRes.json()
+      setShop(updated)
+      setShopForm((prev) => ({
+        ...prev,
+        logoUrl: updated.logoUrl || updated.image || prev.logoUrl,
+        bannerUrl: updated.bannerUrl || prev.bannerUrl,
+      }))
+
+      toast.success(`${kind === 'logo' ? 'Logo' : 'Bannière'} enregistrée`)
+    } catch {
+      toast.error('Erreur pendant l’upload')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const uploadProductImages = async (files: FileList | null) => {
+    if (!shop || !files?.length) return
+    setSaving(true)
+    try {
+      const uploadedUrls: string[] = []
+      for (const file of Array.from(files)) {
+        const dataUri = await fileToDataUri(file)
+        const res = await fetch('/api/uploads/cloudinary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUri, shopId: shop.id, kind: 'product' }),
+        })
+        const payload = await res.json()
+        if (!res.ok) {
+          toast.error(payload.error || 'Échec upload photo produit')
+          continue
+        }
+        uploadedUrls.push(payload.url)
+      }
+      if (uploadedUrls.length > 0) {
+        setProductForm((prev) => ({
+          ...prev,
+          imageUrls: [...prev.imageUrls, ...uploadedUrls],
+        }))
+        toast.success(`${uploadedUrls.length} image(s) produit uploadée(s)`)
+      }
+    } catch {
+      toast.error('Erreur pendant l’upload des images produit')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   useEffect(() => {
     if (user?.role === 'MARCHAND') {
       void fetchShop()
@@ -225,6 +371,40 @@ export default function DashboardView() {
       void fetchOrders()
     }
   }, [shop, fetchOrders])
+
+  useEffect(() => {
+    if (shop) {
+      void fetchPromos()
+    }
+  }, [shop, fetchPromos])
+
+  const deleteShopAsset = async (kind: 'logo' | 'banner') => {
+    if (!shop) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/shops/${shop.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(kind === 'logo' ? { logoUrl: null } : { bannerUrl: null }),
+      })
+      const payload = await res.json()
+      if (!res.ok) {
+        toast.error(payload?.error || 'Suppression impossible')
+        return
+      }
+      setShop(payload)
+      setShopForm((prev) => ({
+        ...prev,
+        logoUrl: kind === 'logo' ? '' : prev.logoUrl,
+        bannerUrl: kind === 'banner' ? '' : prev.bannerUrl,
+      }))
+      toast.success(kind === 'logo' ? 'Logo supprimé' : 'Bannière supprimée')
+    } catch {
+      toast.error('Erreur de connexion')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleSaveShop = async () => {
     if (!shop) return
@@ -282,6 +462,7 @@ export default function DashboardView() {
         name: productForm.name,
         description: productForm.description,
         price: parseFloat(productForm.price),
+        imageUrls: productForm.imageUrls,
         category: productForm.category,
         isAvailable: productForm.isAvailable,
         shopId: shop.id,
@@ -297,7 +478,7 @@ export default function DashboardView() {
         toast.success(editingProduct ? 'Produit mis à jour' : 'Produit ajouté')
         setProductDialogOpen(false)
         setEditingProduct(null)
-        setProductForm({ name: '', description: '', price: '', category: 'Alimentation', isAvailable: true })
+        setProductForm({ name: '', description: '', price: '', imageUrls: [], category: 'Alimentation', isAvailable: true })
         await fetchShop()
       } else {
         toast.error('Erreur lors de la sauvegarde')
@@ -362,6 +543,7 @@ export default function DashboardView() {
       name: product.name,
       description: product.description,
       price: product.price.toString(),
+      imageUrls: product.images && product.images.length > 0 ? product.images.map((img) => img.url) : product.image ? [product.image] : [],
       category: product.category,
       isAvailable: product.isAvailable,
     })
@@ -370,8 +552,104 @@ export default function DashboardView() {
 
   const openAddProduct = () => {
     setEditingProduct(null)
-    setProductForm({ name: '', description: '', price: '', category: 'Alimentation', isAvailable: true })
+    setProductForm({ name: '', description: '', price: '', imageUrls: [], category: 'Alimentation', isAvailable: true })
     setProductDialogOpen(true)
+  }
+
+  const removeProductImageAt = (index: number) => {
+    setProductForm((prev) => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, i) => i !== index),
+    }))
+  }
+
+  const handleCreatePromo = async () => {
+    if (!shop) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/promotions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopId: shop.id,
+          code: promoForm.code,
+          description: promoForm.description || null,
+          discountPercent: promoForm.discountPercent ? Number(promoForm.discountPercent) : null,
+          discountAmount: promoForm.discountAmount ? Number(promoForm.discountAmount) : null,
+          usageLimit: promoForm.usageLimit ? Number(promoForm.usageLimit) : null,
+          startsAt: promoForm.startsAt ? promoForm.startsAt : null,
+          endsAt: promoForm.endsAt ? promoForm.endsAt : null,
+          productIds: promoForm.scope === 'products' ? promoForm.productIds : [],
+        }),
+      })
+      const payload = await res.json()
+      if (!res.ok) {
+        toast.error(payload?.error || 'Impossible de créer le code promo')
+        return
+      }
+      toast.success('Code promo créé')
+      setPromoForm({
+        code: '',
+        description: '',
+        discountPercent: '',
+        discountAmount: '',
+        usageLimit: '',
+        startsAt: '',
+        endsAt: '',
+        scope: 'shop',
+        productIds: [],
+      })
+      await fetchPromos()
+    } catch {
+      toast.error('Erreur de connexion')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTogglePromoActive = async (promoId: string, nextIsActive: boolean) => {
+    if (!shop) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/promotions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ promoId, isActive: nextIsActive }),
+      })
+      const payload = await res.json()
+      if (!res.ok) {
+        toast.error(payload?.error || "Impossible de modifier l'état du code promo")
+        return
+      }
+      toast.success(nextIsActive ? 'Code promo activé' : 'Code promo désactivé')
+      await fetchPromos()
+    } catch {
+      toast.error('Erreur de connexion')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeletePromo = async (promoId: string) => {
+    if (!shop) return
+    if (!confirm('Supprimer ce code promo ?')) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/promotions?promoId=${encodeURIComponent(promoId)}`, {
+        method: 'DELETE',
+      })
+      const payload = await res.json()
+      if (!res.ok) {
+        toast.error(payload?.error || 'Impossible de supprimer le code promo')
+        return
+      }
+      toast.success('Code promo supprimé')
+      await fetchPromos()
+    } catch {
+      toast.error('Erreur de connexion')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) {
@@ -434,6 +712,46 @@ export default function DashboardView() {
                 onChange={(e) => setShopForm({ ...shopForm, whatsappNumber: e.target.value })}
                 className="h-11"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Logo</Label>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-orange-50 border flex items-center justify-center overflow-hidden shrink-0">
+                  {shopForm.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={shopForm.logoUrl} alt="Logo boutique" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-semibold text-orange-600">{shopForm.name?.charAt(0) || 'B'}</span>
+                  )}
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void uploadShopAsset(file, 'logo')
+                  }}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Bannière</Label>
+              <div className="space-y-2">
+                <div className="h-20 rounded-xl bg-orange-50 border overflow-hidden">
+                  {shopForm.bannerUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={shopForm.bannerUrl} alt="Bannière boutique" className="h-full w-full object-cover" />
+                  ) : null}
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void uploadShopAsset(file, 'banner')
+                  }}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -503,101 +821,134 @@ export default function DashboardView() {
           <h1 className="text-2xl font-bold">Tableau de bord</h1>
           <p className="text-sm text-muted-foreground mt-1">Gérez votre boutique en ligne</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openAddProduct}
-            className="hover:bg-orange-50"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Produit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSelectedShopId(shop.id)
-              setView('shop')
-              router.push(`/shop/${shop.id}`)
-            }}
-            className="hover:bg-orange-50"
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            Voir ma boutique
-          </Button>
-        </div>
       </div>
 
-      <MerchantStatsCards stats={stats} />
+      <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+        <aside className="rounded-xl border bg-white p-3 h-fit lg:sticky lg:top-20">
+          <p className="text-xs font-semibold text-muted-foreground px-2 pb-2">Navigation marchand</p>
+          <div className="space-y-1">
+            <Button
+              variant={activeSection === 'overview' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('overview')}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" /> Vue d&apos;ensemble
+            </Button>
+            <Button
+              variant={activeSection === 'products' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('products')}
+            >
+              <Package className="h-4 w-4 mr-2" /> Produits ({shop.products.length})
+            </Button>
+            <Button
+              variant={activeSection === 'orders' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('orders')}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" /> Commandes ({orders.length})
+            </Button>
+            <Button
+              variant={activeSection === 'shop' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('shop')}
+            >
+              <Store className="h-4 w-4 mr-2" /> Boutique
+            </Button>
+            <Button
+              variant={activeSection === 'promos' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveSection('promos')}
+            >
+              <Zap className="h-4 w-4 mr-2" /> Codes promo
+            </Button>
+          </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Button
-          variant="outline"
-          className="h-auto py-3 flex-col gap-2 hover:bg-orange-50 hover:border-orange-200"
-          onClick={openAddProduct}
-        >
-          <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-            <Plus className="h-5 w-5 text-orange-600" />
-          </div>
-          <span className="text-xs font-medium">Ajouter produit</span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-3 flex-col gap-2 hover:bg-green-50 hover:border-green-200"
-          onClick={() => window.open(`https://wa.me/${shop.whatsappNumber.replace(/\s+/g, '').replace('+', '')}`, '_blank')}
-        >
-          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-            <MessageCircle className="h-5 w-5 text-green-600" />
-          </div>
-          <span className="text-xs font-medium">Ouvrir WhatsApp</span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-3 flex-col gap-2 hover:bg-blue-50 hover:border-blue-200"
-          onClick={() => {
-            setSelectedShopId(shop.id)
-            setView('shop')
-            router.push(`/shop/${shop.id}`)
-          }}
-        >
-          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-            <Eye className="h-5 w-5 text-blue-600" />
-          </div>
-          <span className="text-xs font-medium">Voir boutique</span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-3 flex-col gap-2 hover:bg-purple-50 hover:border-purple-200"
-          onClick={() => {
-            setSelectedShopId(shop.id)
-            setView('orders')
-            router.push('/orders')
-          }}
-        >
-          <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-            <BarChart3 className="h-5 w-5 text-purple-600" />
-          </div>
-          <span className="text-xs font-medium">Voir commandes</span>
-        </Button>
-      </div>
+        </aside>
 
-      <Tabs defaultValue="products" className="space-y-4">
-        <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="products" className="gap-1">
-            <Package className="h-4 w-4" /> Produits
-          </TabsTrigger>
-          <TabsTrigger value="orders" className="gap-1">
-            <ShoppingCart className="h-4 w-4" /> Commandes
-          </TabsTrigger>
-          <TabsTrigger value="shop" className="gap-1">
-            <Store className="h-4 w-4" /> Boutique
-          </TabsTrigger>
-        </TabsList>
+        <section className="space-y-4">
+        {activeSection === 'overview' ? (
+          <>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openAddProduct}
+                className="hover:bg-orange-50"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Produit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedShopId(shop.id)
+                  setView('shop')
+                  router.push(`/shop/${shop.id}`)
+                }}
+                className="hover:bg-orange-50"
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                Voir ma boutique
+              </Button>
+            </div>
+            <MerchantStatsCards stats={stats} />
 
-        {/* Products Tab */}
-        <TabsContent value="products">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Button
+                variant="outline"
+                className="h-auto py-3 flex-col gap-2 hover:bg-orange-50 hover:border-orange-200"
+                onClick={openAddProduct}
+              >
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                  <Plus className="h-5 w-5 text-orange-600" />
+                </div>
+                <span className="text-xs font-medium">Ajouter produit</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-3 flex-col gap-2 hover:bg-green-50 hover:border-green-200"
+                onClick={() => window.open(`https://wa.me/${shop.whatsappNumber.replace(/\s+/g, '').replace('+', '')}`, '_blank')}
+              >
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                  <MessageCircle className="h-5 w-5 text-green-600" />
+                </div>
+                <span className="text-xs font-medium">Ouvrir WhatsApp</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-3 flex-col gap-2 hover:bg-blue-50 hover:border-blue-200"
+                onClick={() => {
+                  setSelectedShopId(shop.id)
+                  setView('shop')
+                  router.push(`/shop/${shop.id}`)
+                }}
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <Eye className="h-5 w-5 text-blue-600" />
+                </div>
+                <span className="text-xs font-medium">Voir boutique</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-3 flex-col gap-2 hover:bg-purple-50 hover:border-purple-200"
+                onClick={() => {
+                  setSelectedShopId(shop.id)
+                  setView('orders')
+                  router.push('/orders')
+                }}
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                </div>
+                <span className="text-xs font-medium">Voir commandes</span>
+              </Button>
+            </div>
+          </>
+        ) : null}
+
+        {activeSection === 'products' ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold">Mes produits ({shop.products.length})</h2>
@@ -671,10 +1022,9 @@ export default function DashboardView() {
               </div>
             )}
           </div>
-        </TabsContent>
+        ) : null}
 
-        {/* Orders Tab */}
-        <TabsContent value="orders">
+        {activeSection === 'orders' ? (
           <div className="space-y-3">
             {orders.length === 0 ? (
               <div className="text-center py-12">
@@ -763,10 +1113,9 @@ export default function DashboardView() {
               </div>
             )}
           </div>
-        </TabsContent>
+        ) : null}
 
-        {/* Shop Tab */}
-        <TabsContent value="shop">
+        {activeSection === 'shop' ? (
           <Card className="shadow-sm border-0">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -797,6 +1146,64 @@ export default function DashboardView() {
                   onChange={(e) => setShopForm({ ...shopForm, whatsappNumber: e.target.value })}
                   className="h-11"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Logo</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-orange-50 border flex items-center justify-center overflow-hidden shrink-0">
+                    {shopForm.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={shopForm.logoUrl} alt="Logo boutique" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-semibold text-orange-600">{shopForm.name?.charAt(0) || 'B'}</span>
+                    )}
+                  </div>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadShopAsset(file, 'logo')
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving || !shopForm.logoUrl}
+                    onClick={() => void deleteShopAsset('logo')}
+                  >
+                    Supprimer
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Bannière</Label>
+                <div className="space-y-2">
+                  <div className="h-20 rounded-xl bg-orange-50 border overflow-hidden">
+                    {shopForm.bannerUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={shopForm.bannerUrl} alt="Bannière boutique" className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) void uploadShopAsset(file, 'banner')
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving || !shopForm.bannerUrl}
+                      onClick={() => void deleteShopAsset('banner')}
+                    >
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -842,8 +1249,151 @@ export default function DashboardView() {
               </Button>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        ) : null}
+
+        {activeSection === 'promos' ? (
+          <div className="space-y-4">
+            <Card className="shadow-sm border-0">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-orange-500" />
+                  Créer un code promo
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Code *</Label>
+                    <Input value={promoForm.code} onChange={(e) => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })} placeholder="EX: RAMADAN10" className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Input value={promoForm.description} onChange={(e) => setPromoForm({ ...promoForm, description: e.target.value })} placeholder="Ex: -10% sur une sélection" className="h-11" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Réduction (%)</Label>
+                    <Input type="number" value={promoForm.discountPercent} onChange={(e) => setPromoForm({ ...promoForm, discountPercent: e.target.value, discountAmount: '' })} placeholder="10" className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Réduction (montant)</Label>
+                    <Input type="number" value={promoForm.discountAmount} onChange={(e) => setPromoForm({ ...promoForm, discountAmount: e.target.value, discountPercent: '' })} placeholder="1000" className="h-11" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label>Limite d’utilisation</Label>
+                    <Input type="number" value={promoForm.usageLimit} onChange={(e) => setPromoForm({ ...promoForm, usageLimit: e.target.value })} placeholder="Ex: 100" className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Début</Label>
+                    <Input type="datetime-local" value={promoForm.startsAt} onChange={(e) => setPromoForm({ ...promoForm, startsAt: e.target.value })} className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fin</Label>
+                    <Input type="datetime-local" value={promoForm.endsAt} onChange={(e) => setPromoForm({ ...promoForm, endsAt: e.target.value })} className="h-11" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Portée</Label>
+                  <Select value={promoForm.scope} onValueChange={(v: any) => setPromoForm({ ...promoForm, scope: v, productIds: [] })}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="shop">Toute la boutique</SelectItem>
+                      <SelectItem value="products">Produits sélectionnés</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {promoForm.scope === 'products' ? (
+                  <div className="space-y-2">
+                    <Label>Produits concernés</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {shop.products.map((p) => {
+                        const checked = promoForm.productIds.includes(p.id)
+                        return (
+                          <label key={p.id} className="flex items-center gap-2 rounded-lg border p-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...promoForm.productIds, p.id]
+                                  : promoForm.productIds.filter((id) => id !== p.id)
+                                setPromoForm({ ...promoForm, productIds: next })
+                              }}
+                            />
+                            <span className="truncate">{p.name}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                <Button onClick={handleCreatePromo} disabled={saving || !promoForm.code || (!promoForm.discountPercent && !promoForm.discountAmount)} className="bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Créer
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-0">
+              <CardHeader>
+                <CardTitle className="text-lg">Mes codes promo</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {promos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aucun code promo pour le moment.</p>
+                ) : (
+                  promos.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{p.code}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {p.discountPercent ? `-${p.discountPercent}%` : p.discountAmount ? `-${p.discountAmount}` : ''}{' '}
+                          {p.products && p.products.length > 0 ? `• ${p.products.length} produit(s)` : '• Boutique'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge className={p.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
+                          {p.isActive ? 'Actif' : 'Inactif'}
+                        </Badge>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={saving}
+                          onClick={() => void handleTogglePromoActive(p.id, !p.isActive)}
+                        >
+                          {p.isActive ? 'Désactiver' : 'Activer'}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={saving}
+                          className="text-red-500 hover:text-red-600"
+                          onClick={() => void handleDeletePromo(p.id)}
+                        >
+                          Supprimer
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+        </section>
+      </div>
 
       {/* Product Dialog */}
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
@@ -877,6 +1427,36 @@ export default function DashboardView() {
                 value={productForm.price}
                 onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
                 className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Photos du produit</Label>
+              {productForm.imageUrls.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {productForm.imageUrls.map((url, idx) => (
+                    <div key={`${url}-${idx}`} className="relative h-20 rounded-lg overflow-hidden border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Photo produit ${idx + 1}`} className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeProductImageAt(idx)}
+                        className="absolute top-1 right-1 bg-black/60 text-white text-xs rounded px-2 py-0.5"
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Aucune photo. Téléversez des images ci-dessous.</p>
+              )}
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  void uploadProductImages(e.target.files)
+                }}
               />
             </div>
             <div className="space-y-2">

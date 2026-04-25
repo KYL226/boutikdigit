@@ -21,6 +21,8 @@ model User {
 
   shop      Shop?
   orders    Order[]
+  shopReviews    ShopReview[]
+  productReviews ProductReview[]
 }
 
 model Shop {
@@ -29,6 +31,8 @@ model Shop {
   description    String   @default("")
   whatsappNumber String
   image          String?
+  logoUrl        String?
+  bannerUrl      String?
   location       String   // quartier
   city           String   // ville
   isActive       Boolean  @default(true)
@@ -41,6 +45,8 @@ model Shop {
 
   products       Product[]
   orders         Order[]
+  promoCodes     PromoCode[]
+  reviews        ShopReview[]
 }
 
 model Product {
@@ -58,6 +64,9 @@ model Product {
   shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   orderItems  OrderItem[]
+  images      ProductImage[]
+  reviews     ProductReview[]
+  promoCodes  PromoCodeProduct[]
 }
 
 model Order {
@@ -91,4 +100,77 @@ model OrderItem {
 
   productId   String
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  url       String
+  createdAt DateTime @default(now())
+
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model PromoCode {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  description       String?
+  discountPercent   Float?
+  discountAmount    Float?
+  startsAt          DateTime?
+  endsAt            DateTime?
+  isActive          Boolean  @default(true)
+  usageLimit        Int?
+  usedCount         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  shopId            String
+  shop              Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  // Si vide => promo valable sur toute la boutique.
+  products          PromoCodeProduct[]
+}
+
+model PromoCodeProduct {
+  promoCodeId String
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([promoCodeId, productId])
+  @@index([productId])
+}
+
+model ShopReview {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+}
+
+model ProductReview {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
 }
